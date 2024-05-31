@@ -1,0 +1,199 @@
+<!--
+ Copyright 2024 Google LLC
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+
+<mat-toolbar color="primary">
+  <button
+    mat-icon-button
+    aria-label="Menu"
+    matTooltip="Menu"
+    (click)="sidenav.toggle()">
+    <mat-icon>menu</mat-icon>
+  </button>
+  <span>Graph Explorer - {{title}}</span>
+  <span class="spacer"></span>
+  <button
+    mat-icon-button
+    aria-label="Lay out"
+    matTooltip="Lay out"
+    (click)="layout()">
+    <mat-icon>hub</mat-icon>
+  </button>
+  <button
+    mat-icon-button
+    aria-label="Help"
+    matTooltip="Help"
+    (click)="help()">
+    <mat-icon>help</mat-icon>
+  </button>
+</mat-toolbar>
+
+<mat-sidenav-container>
+  <mat-sidenav #sidenav mode="side">
+    <div class="sidenav-content">
+      <mat-form-field *ngIf="editMode">
+        <mat-label>Title</mat-label>
+        <input
+          type="text"
+          matInput
+          [ngModel]="title"
+          (ngModelChange)="onGraphTitleChange($event)">
+      </mat-form-field>
+      <h3 *ngIf="!editMode">{{title}}</h3>
+
+      <mat-form-field *ngIf="editMode">
+        <mat-label>Description</mat-label>
+        <textarea
+          matInput
+          [ngModel]="description"
+          (ngModelChange)="onGraphDescriptionChange($event)"
+          rows="4">
+        </textarea>
+      </mat-form-field>
+      <!-- Careful of the whitespace here because we're using pre-wrap. -->
+      <div
+        *ngIf="!editMode"
+        class="description"
+        >{{description}}</div>
+
+      <div class="row">
+        <button
+          mat-raised-button
+          (click)="expand('')">
+          <mat-icon>unfold_more_double</mat-icon>
+          Expand all
+        </button>
+        <button
+          mat-raised-button
+          (click)="layout()">
+          <mat-icon>hub</mat-icon>
+          Layout
+        </button>
+      </div>
+
+      <mat-accordion multi>
+        <mat-expansion-panel>
+          <mat-expansion-panel-header>
+            <mat-panel-title>
+              Transformations ({{transformations.length}})
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+          <mat-chip-set class="mat-mdc-chip-set-stacked">
+            <mat-chip
+              *ngFor="let transformation of transformations"
+              matTooltip="{{transformation.query}}"
+              (removed)="removeTransformation(transformation)">
+              {{transformation.name}}
+              <button matChipRemove>
+                <mat-icon>cancel</mat-icon>
+              </button>
+            </mat-chip>
+          </mat-chip-set>
+          <form #transformationForm="ngForm">
+          <mat-form-field class="query-field">
+            <mat-label>New transformation</mat-label>
+            <textarea
+              matInput
+              #newTransformationField
+              gqlQuery
+              [(ngModel)]="userQuery"
+              name="transformation"
+              rows="10"></textarea>
+          </mat-form-field>
+          <mat-error *ngIf="transformationForm?.controls?.['transformation']?.errors">
+            {{
+            transformationForm?.controls?.['transformation']?.errors?.['error']
+            }}
+          </mat-error>
+          <button
+            [disabled]="!transformationForm.valid || !newTransformationField.value"
+            mat-raised-button
+            (click)="addTransformation(newTransformationField.value, newTransformationField.value); newTransformationField.value = ''">
+            Add
+            <mat-icon>add</mat-icon>
+          </button>
+          </form>
+          <!-- <button -->
+          <!--   mat-raised-button -->
+          <!--   class="show-all" -->
+          <!--   [disabled]="hiddenSelectors.length === 0" -->
+          <!--   (click)="show('')"> -->
+          <!--   <mat-icon>visibility</mat-icon> -->
+          <!--   Show all -->
+          <!-- </button> -->
+        </mat-expansion-panel>
+        <mat-expansion-panel>
+          <mat-expansion-panel-header>
+            <mat-panel-title>
+              Selected element
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+          <element-properties
+            *ngIf="selected"
+            [element]="selected"
+            [editMode]="editMode"
+            (classesChange)="onClassesChange($event)"
+            (labelChange)="onLabelChange($event)"
+            (descriptionChange)="onDescriptionChange($event)"/>
+          <ng-container *ngIf="!selected && !multipleSelected">
+            Nothing selected.
+          </ng-container>
+          <multi-element-properties
+            *ngIf="!selected && multipleSelected"
+            [selection]="selection"
+            [editMode]="editMode"
+            (classesAdded)="onClassesAdded($event)"
+            (classesRemoved)="onClassesRemoved($event)"/>
+        </mat-expansion-panel>
+        <mat-expansion-panel>
+          <mat-expansion-panel-header>
+            <mat-panel-title>
+              Graph definition
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+          <mat-slide-toggle [(ngModel)]="editMode">
+            Edit mode
+          </mat-slide-toggle>
+          <mat-form-field class="graph-def-field">
+            <mat-label>Graph definition</mat-label>
+            <textarea
+              matInput
+              [value]="customData"
+              #customDataField
+              rows="10"></textarea>
+          </mat-form-field>
+          <div class="row">
+            <button
+              mat-raised-button
+              (click)="copy(customDataField.value)">
+              Copy
+              <mat-icon>content_copy</mat-icon>
+            </button>
+            <button
+              mat-raised-button
+              (click)="reload(customDataField.value)">
+              <mat-icon>refresh</mat-icon>
+              Reload
+            </button>
+          </div>
+        </mat-expansion-panel>
+      </mat-accordion>
+    </div>
+  </mat-sidenav>
+
+  <mat-sidenav-content>
+    <div #graph class="graph"></div>
+  </mat-sidenav-content>
+</mat-sidenav-container>

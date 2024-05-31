@@ -1,0 +1,11 @@
+{
+    "name": "@types/cytoscape-expand-collapse",
+    "version": "4.1.0",
+    "main": "",
+    "types": "index.d.ts",
+    "scripts": {},
+    "dependencies": {
+        "@types/cytoscape": "*"
+    },
+    "typeScriptVersion": "4.2"
+}

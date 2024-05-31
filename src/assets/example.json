@@ -1,0 +1,536 @@
+{
+  "data": {
+    "title": "Sample graph",
+    "description": "This graph is a basic demonstration of what the app can do.\n\nEnable edit mode (under \"Graph definition\") to edit me."
+  },
+  "graph": {
+    "nodes": [
+      {
+        "id": "server",
+        "labels": [
+          "server"
+        ],
+        "properties": {
+          "label": "Server",
+          "description": "This serves websites."
+        }
+      },
+      {
+        "id": "server_router",
+        "labels": [
+          "router"
+        ],
+        "properties": {
+          "label": "Router",
+          "description": "The router on the server network."
+        }
+      },
+      {
+        "id": "db_router",
+        "labels": [
+          "router"
+        ],
+        "properties": {
+          "label": "Router",
+          "description": "The databases' router."
+        }
+      },
+      {
+        "id": "website_network",
+        "labels": [
+          "network"
+        ],
+        "properties": {
+          "label": "Website Network"
+        }
+      },
+      {
+        "id": "db_network",
+        "labels": [
+          "subnet",
+          "network"
+        ],
+        "properties": {
+          "label": "DB Network",
+          "description": "The databases' network."
+        }
+      },
+      {
+        "id": "server_network",
+        "labels": [
+          "subnet",
+          "network"
+        ],
+        "properties": {
+          "label": "Server Network",
+          "description": "The server network."
+        }
+      },
+      {
+        "id": "db1",
+        "labels": [
+          "db",
+          "shard_1"
+        ],
+        "properties": {
+          "label": "DB 1",
+          "description": "Holds properties for shard 1."
+        }
+      },
+      {
+        "id": "db2",
+        "labels": [
+          "db",
+          "shard_2"
+        ],
+        "properties": {
+          "label": "DB 2",
+          "description": "Holds properties for shard 2."
+        }
+      },
+      {
+        "id": "client_network",
+        "labels": [
+          "network"
+        ],
+        "properties": {
+          "label": "Client Network",
+          "description": "The clients' network."
+        }
+      },
+      {
+        "id": "client_1",
+        "labels": [
+          "client",
+          "shard_1"
+        ],
+        "properties": {
+          "label": "Client 1",
+          "description": "Client number 1."
+        }
+      },
+      {
+        "id": "client_router",
+        "labels": [
+          "router"
+        ],
+        "properties": {
+          "label": "Router",
+          "description": "The router on the clients' network."
+        }
+      },
+      {
+        "id": "client_2",
+        "labels": [
+          "client",
+          "shard_2"
+        ],
+        "properties": {
+          "label": "Client 2",
+          "description": "Client number 2."
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "__parent__db_router",
+        "source": "db_router",
+        "target": "db_network",
+        "labels": [
+          "_PARENT"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "server_router_to_db_router",
+        "source": "server_router",
+        "target": "db_router",
+        "labels": [
+          "network-link"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "__align__client_1__client_2",
+        "source": "client_1",
+        "target": "client_2",
+        "labels": [
+          "_ALIGN_VERTICAL"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "client_router_to_server_router",
+        "source": "client_router",
+        "target": "server_router",
+        "labels": [
+          "network-link"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "db_router_to_db1",
+        "source": "db_router",
+        "target": "db1",
+        "labels": [
+          "network-link"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "db_router_to_db2",
+        "source": "db_router",
+        "target": "db2",
+        "labels": [
+          "network-link"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "__parent__client_1",
+        "source": "client_1",
+        "target": "client_network",
+        "labels": [
+          "_PARENT"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "__place_right_of__client_router__client_1",
+        "source": "client_router",
+        "target": "client_1",
+        "labels": [
+          "_PLACE_RIGHT_OF"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "__parent__client_2",
+        "source": "client_2",
+        "target": "client_network",
+        "labels": [
+          "_PARENT"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "__place_right_of__db2__db_router",
+        "source": "db2",
+        "target": "db_router",
+        "labels": [
+          "_PLACE_RIGHT_OF"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "__place_right_of__client_router__client_2",
+        "source": "client_router",
+        "target": "client_2",
+        "labels": [
+          "_PLACE_RIGHT_OF"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "__parent__db1",
+        "source": "db1",
+        "target": "db_network",
+        "labels": [
+          "_PARENT"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "__place_below__server__server_router",
+        "source": "server",
+        "target": "server_router",
+        "labels": [
+          "_PLACE_BELOW"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "__place_right_of__db1__db_router",
+        "source": "db1",
+        "target": "db_router",
+        "labels": [
+          "_PLACE_RIGHT_OF"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "__align__server_router__db_router",
+        "source": "server_router",
+        "target": "db_router",
+        "labels": [
+          "_ALIGN_HORIZONTAL"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "__parent__db2",
+        "source": "db2",
+        "target": "db_network",
+        "labels": [
+          "_PARENT"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "__place_right_of__server_router__client_router",
+        "source": "server_router",
+        "target": "client_router",
+        "labels": [
+          "_PLACE_RIGHT_OF"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "__align__client_router__server_router",
+        "source": "client_router",
+        "target": "server_router",
+        "labels": [
+          "_ALIGN_HORIZONTAL"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "__place_right_of__db_router__server_router",
+        "source": "db_router",
+        "target": "server_router",
+        "labels": [
+          "_PLACE_RIGHT_OF"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "server_router_to_server",
+        "source": "server_router",
+        "target": "server",
+        "labels": [
+          "network-link"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "__parent__server",
+        "source": "server",
+        "target": "server_network",
+        "labels": [
+          "_PARENT"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "client_1_to_db1",
+        "source": "client_1",
+        "target": "db1",
+        "labels": [
+          "data-placement"
+        ],
+        "properties": {
+          "label": "Shard 1"
+        }
+      },
+      {
+        "id": "client_2_to_db2",
+        "source": "client_2",
+        "target": "db2",
+        "labels": [
+          "data-placement"
+        ],
+        "properties": {
+          "label": "Shard 2"
+        }
+      },
+      {
+        "id": "__parent__client_router",
+        "source": "client_router",
+        "target": "client_network",
+        "labels": [
+          "_PARENT"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "__place_below__client_2__client_1",
+        "source": "client_2",
+        "target": "client_1",
+        "labels": [
+          "_PLACE_BELOW"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "__parent__db_network",
+        "source": "db_network",
+        "target": "website_network",
+        "labels": [
+          "_PARENT"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "__place_below__db2__db1",
+        "source": "db2",
+        "target": "db1",
+        "labels": [
+          "_PLACE_BELOW"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "client_2_to_client_router",
+        "source": "client_2",
+        "target": "client_router",
+        "labels": [
+          "network-link"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "__parent__server_router",
+        "source": "server_router",
+        "target": "server_network",
+        "labels": [
+          "_PARENT"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "client_1_to_client_router",
+        "source": "client_1",
+        "target": "client_router",
+        "labels": [
+          "network-link"
+        ],
+        "properties": {}
+      },
+      {
+        "id": "__parent__server_network",
+        "source": "server_network",
+        "target": "website_network",
+        "labels": [
+          "_PARENT"
+        ],
+        "properties": {}
+      }
+    ]
+  },
+  "style": [
+    {
+      "selector": "node",
+      "style": {
+        "background-color": "#666",
+        "font-size": "10pt"
+      }
+    },
+    {
+      "selector": "node:selected",
+      "style": {
+        "background-color": "#66f"
+      }
+    },
+    {
+      "selector": "*[label]",
+      "style": {
+        "label": "data(label)"
+      }
+    },
+    {
+      "selector": "edge",
+      "style": {
+        "font-size": "10pt",
+        "width": 3,
+        "line-color": "#ccc",
+        "target-arrow-color": "#ccc",
+        "curve-style": "bezier"
+      }
+    },
+    {
+      "selector": "edge:selected",
+      "style": {
+        "line-color": "#ccf",
+        "target-arrow-color": "#ccf"
+      }
+    },
+    {
+      "selector": ".user_data_network-link",
+      "style": {}
+    },
+    {
+      "selector": ".user_data_data-placement",
+      "style": {
+        "line-style": "dotted",
+        "target-arrow-shape": "triangle"
+      }
+    },
+    {
+      "selector": ".user_data_client",
+      "style": {
+        "shape": "round-triangle"
+      }
+    },
+    {
+      "selector": ".user_data_server",
+      "style": {
+        "shape": "polygon",
+        "shape-polygon-points": "0.096 -1 0.191 -0.834 0.096 -0.669 0.096 -0.231 0.405 -0.541 0.455 -.725 0.639 -0.775 0.775 -0.639 0.725 -0.455 0.541 -0.405 0.231 -0.096 0.669 -0.096 0.834 -0.191 1.0 -0.096 1.0 0.096 0.834 0.191 0.669 0.096 0.231 0.096 0.541 0.405 0.725 0.455 0.775 0.639 0.639 0.775 0.455 0.725 0.405 0.541 0.096 0.231 0.096 0.669 0.191 0.834 0.096 1.0 -0.096 1.0 -0.191 0.834 -0.096 0.669 -0.096 0.231 -0.405 0.541 -0.455 0.725 -0.639 0.775 -0.775 0.639 -0.725 0.455 -0.541 0.405 -0.231 0.096 -0.669 0.096 -0.834 0.191 -1.0 0.096 -1.0 -0.096 -0.834 -0.191 -0.669 -0.096 -0.231 -0.096 -0.541 -0.405 -0.725 -0.455 -0.775 -0.639 -0.639 -0.775 -0.455 -0.725 -0.405 -0.541 -0.096 -0.231 -0.096 -0.669 -0.191 -0.834 -0.096 -1.0"
+      }
+    },
+    {
+      "selector": ".user_data_router",
+      "style": {
+        "shape": "octagon"
+      }
+    },
+    {
+      "selector": "$* > *",
+      "style": {
+        "background-color": "#888"
+      }
+    },
+    {
+      "selector": "$*:selected > *",
+      "style": {
+        "background-color": "#88f"
+      }
+    },
+    {
+      "selector": "$* > * > *",
+      "style": {
+        "background-color": "#aaa"
+      }
+    },
+    {
+      "selector": "$*:selected > * > *",
+      "style": {
+        "background-color": "#aaf"
+      }
+    },
+    {
+      "selector": ".cy-expand-collapse-collapsed-node",
+      "style": {
+        "border-color": "black",
+        "border-style": "double",
+        "border-width": "4px"
+      }
+    },
+    {
+      "selector": ".user_data_db",
+      "style": {
+        "background-image": "data:image/svg+xml;utf8,%3C%3Fxml%20version%3D%221.0%22%20encoding%3D%22UTF-8%22%3F%3E%3Csvg%20width%3D%2232px%22%20height%3D%2232px%22%20version%3D%221.1%22%20viewBox%3D%220%200%2016%2016%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22%23808080%22%20stroke%3D%22%23000%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22m2%203.5v10a6%201.5%200%200%200%206%201.5%206%201.5%200%200%200%206-1.5v-10z%22%2F%3E%3Cellipse%20cx%3D%228%22%20cy%3D%223%22%20rx%3D%226%22%20ry%3D%221.5%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E",
+        "shape": "rectangle",
+        "background-opacity": 0
+      }
+    },
+    {
+      "selector": ".user_data_db:selected",
+      "style": {
+        "background-image": "data:image/svg+xml;utf8,%3C%3Fxml%20version%3D%221.0%22%20encoding%3D%22UTF-8%22%3F%3E%3Csvg%20width%3D%2232px%22%20height%3D%2232px%22%20version%3D%221.1%22%20viewBox%3D%220%200%2016%2016%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22%238080ff%22%20stroke%3D%22%23000%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22m2%203.5v10a6%201.5%200%200%200%206%201.5%206%201.5%200%200%200%206-1.5v-10z%22%2F%3E%3Cellipse%20cx%3D%228%22%20cy%3D%223%22%20rx%3D%226%22%20ry%3D%221.5%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E",
+        "shape": "rectangle",
+        "background-opacity": 0
+      }
+    }
+  ]
+}

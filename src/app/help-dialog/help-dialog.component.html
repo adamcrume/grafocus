@@ -1,0 +1,45 @@
+<!--
+ Copyright 2024 Google LLC
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+
+<h1 mat-dialog-title>Help</h1>
+<div mat-dialog-content>
+  <h2>Selection</h2>
+  Individual elements (nodes or edges) can be selected by clicking on them.
+  Shift-clicking or control-clicking will add or remove nodes to the current
+  selection. Shift-click-dragging or control-click-dragging will add all
+  elements in a region to the selection.
+
+  <h2>Hiding elements</h2>
+  Right-clicking on an element presents options for hiding a specific element or
+  entire classes of elements. Hidden elements can be re-shown by cancelling
+  chips in the "Transformations" panel.
+
+  <h2>Collapsing compound nodes</h2>
+  Right-clicking on a compound node presents options for collapsing classes of
+  nodes. Clicking on a compound node shows an icon on that node for collapsing
+  or expanding that individual node.
+
+  <h2>Edit mode</h2>
+  To enable edit mode, click on the toggle in the "Graph definition" panel.
+</div>
+<div mat-dialog-actions>
+  <button
+    mat-button
+    (click)="onDismissClicked()"
+    color="primary">
+    Dismiss
+  </button>
+</div>
