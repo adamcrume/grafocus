@@ -32,6 +32,12 @@ but they can be used in transformations.
 The stylesheet follows [Cytoscape.js's format](https://js.cytoscape.org/#style).
 Classes are the node/edge labels prefixed with `user_data_`.
 
+## Data handling
+
+No data is stored or transferred out of the browser, which means that once the
+tab is closed, entered data is gone.  However, please consider the risks and be
+conscious of the data you enter into the application.
+
 ## Developing
 
 This project uses [Angular](https://github.com/angular/angular).
