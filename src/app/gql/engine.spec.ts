@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {planQuery} from './engine';
+import {describeQueryPlan, planQuery} from './engine';
 import {Edge, Graph, Node} from './graph';
 import {NUMBER} from './types';
 import {checkCastEdgeRef, checkCastList, checkCastNodeRef, numberValue, stringValue, tryCastList, tryCastNodeRef, tryCastEdgeRef, Value} from './values';
@@ -67,6 +67,32 @@ function executeQuery(query: string, graph: Graph<Value>): {graph: Graph<Value>,
     const {graph: graph2, data} = planQuery(parseQuery(query)).execute(graph);
     return {graph: graph2, data: sortedNodeRows(data)};
 }
+
+describe('describeQueryPlan', () => {
+    it('can describe query', () => {
+        const plan = planQuery(parseQuery('match (x) delete x'));
+        expect(describeQueryPlan(plan)).toEqual(
+`read_path
+  scan_graph
+  match_node: name=x
+delete: x
+`);
+    });
+
+    it('can describe long paths', () => {
+        const plan = planQuery(parseQuery('match (n1)-[e1]-()-[e2:Foo {bar:1}]->(n3:Bar {baz:1}) return n1, n3'));
+        expect(describeQueryPlan(plan)).toEqual(
+`read_path
+  scan_graph
+  match_node: name=n1
+  match_edge: name=e1
+  match_node
+  match_edge: name=e2, direction=RIGHT, label=Foo, properties={bar: 1}
+  match_node: name=n3, label=Bar, properties={baz: 1}
+return: n1, n3
+`);
+    });
+});
 
 describe('execute', () => {
     it('can delete everything', () => {

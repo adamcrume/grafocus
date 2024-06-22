@@ -16,7 +16,7 @@
 
 import Immutable from 'immutable';
 import {Edge, Graph, Node} from './graph';
-import {Create, Edge as ASTEdge, Expression, Delete, LabelExpression, Node as ASTNode, Path, Query as ASTQuery, ReadClause, ReturnClause, UpdateClause} from './parser';
+import {Create, Edge as ASTEdge, Expression, Delete, formatExpression, formatLabelExpression, formatMapLiteral, formatPath, LabelExpression, Node as ASTNode, Path, Query as ASTQuery, quoteIdentifier, ReadClause, ReturnClause, UpdateClause} from './parser';
 import {booleanValue, checkCastNodeRef, EdgeRef, edgeRefValue, listValue, NodeRef, nodeRefValue, numberValue, stringValue, tryCastBoolean, tryCastEdgeRef, tryCastNodeRef, Value} from './values';
 
 export interface ExecuteQueryResult {
@@ -26,6 +26,73 @@ export interface ExecuteQueryResult {
 
 export interface QueryPlan {
     execute(graph: Graph<Value>): ExecuteQueryResult;
+
+    stages(): QueryPlanStage[];
+}
+
+export type QueryPlanStageData = null|string|string[]|Array<[string, string|null]>
+
+export interface QueryPlanStage {
+    stageName(): string;
+
+    stageChildren(): QueryPlanStage[];
+
+    stageData(): QueryPlanStageData;
+}
+
+export function describeQueryPlan(plan: QueryPlan): string {
+    let result = '';
+    for (const stage of plan.stages()) {
+        result += describeQueryPlanStage(stage, 0);
+    }
+    return result;
+}
+
+function describeQueryPlanStage(stage: QueryPlanStage, indent: number): string {
+    let result = '';
+    for (let i = 0; i < indent; i++) {
+        result += '  ';
+    }
+    result += stage.stageName();
+    const stageData = stage.stageData();
+    if (stageData !== null) {
+        let details = '';
+        if (typeof stageData === 'string') {
+            details += stageData;
+        } else if (Array.isArray(stageData)) {
+            let first = true;
+            for (const element of stageData) {
+                if (Array.isArray(element)) {
+                    const [k, v] = element;
+                    if (v === null) {
+                        continue;
+                    }
+                    if (!first) {
+                        details += ', ';
+                    }
+                    first = false;
+                    details += k;
+                    details += '=';
+                    details += v;
+                } else {
+                    if (!first) {
+                        details += ', ';
+                    }
+                    first = false;
+                    details += element;
+                }
+            }
+        }
+        if (details.length) {
+            result += ': ';
+            result += details;
+        }
+    }
+    result += '\n';
+    for (const child of stage.stageChildren()) {
+        result += describeQueryPlanStage(child, indent + 1);
+    }
+    return result;
 }
 
 type Match = Scope<string, Value>;
@@ -66,7 +133,7 @@ interface State {
     createEdgeID: () => string,
 }
 
-interface Stage {
+interface Stage extends QueryPlanStage {
     execute(state: State): void;
 }
 
@@ -138,17 +205,35 @@ function edgeMatches(edge: Edge<Value>, pattern: ASTEdge): boolean {
     return true;
 }
 
-abstract class MatchStep {
+abstract class MatchStep implements QueryPlanStage {
+    abstract stageName(): string;
+    abstract stageChildren(): QueryPlanStage[];
+    abstract stageData(): QueryPlanStageData;
     abstract match(graph: Graph<Value>, pos: PathMatch): PathMatch[];
 }
 
-abstract class MatchInitializer {
+abstract class MatchInitializer implements QueryPlanStage {
+    abstract stageName(): string;
+    abstract stageChildren(): QueryPlanStage[];
+    abstract stageData(): QueryPlanStageData;
     abstract initial(match: Match, graph: Graph<Value>): PathMatch[];
 }
 
 class ScanGraph extends MatchInitializer {
     constructor() {
         super();
+    }
+
+    override stageName(): string {
+        return 'scan_graph';
+    }
+
+    override stageChildren(): QueryPlanStage[] {
+        return [];
+    }
+
+    override stageData(): null {
+        return null;
     }
 
     override initial(match: Match, graph: Graph<Value>): PathMatch[] {
@@ -165,22 +250,34 @@ class ScanGraph extends MatchInitializer {
 }
 
 class MoveHeadToVariable extends MatchInitializer {
-    constructor(readonly name: string) {
+    constructor(readonly variableName: string) {
         super();
     }
 
+    override stageName(): string {
+        return 'move_head_to_variable';
+    }
+
+    override stageChildren(): QueryPlanStage[] {
+        return [];
+    }
+
+    override stageData(): string {
+        return quoteIdentifier(this.variableName);
+    }
+
     override initial(match: Match, graph: Graph<Value>): PathMatch[] {
-        const value = match.get(this.name);
+        const value = match.get(this.variableName);
         if (value === undefined) {
-            throw new Error(`Variable ${this.name} not defined`);
+            throw new Error(`Variable ${this.variableName} not defined`);
         }
         const nodeID = checkCastNodeRef(value);
         if (nodeID === undefined) {
-            throw new Error(`Variable ${this.name} is not a node (${JSON.stringify(value)})`);
+            throw new Error(`Variable ${this.variableName} is not a node (${JSON.stringify(value)})`);
         }
         const node = graph.getNodeByID(nodeID);
         if (node === undefined) {
-            throw new Error(`Node ${nodeID} (from variable ${this.name}) not found`);
+            throw new Error(`Node ${nodeID} (from variable ${this.variableName}) not found`);
         }
         return [{
             match,
@@ -195,6 +292,18 @@ class MoveHeadToVariable extends MatchInitializer {
 class ScanGraphStep extends MatchStep {
     constructor() {
         super();
+    }
+
+    override stageName(): string {
+        return 'scan_graph';
+    }
+
+    override stageChildren(): QueryPlanStage[] {
+        return [];
+    }
+
+    override stageData(): QueryPlanStageData {
+        return null;
     }
 
     override match(graph: Graph<Value>, pos: PathMatch): PathMatch[] {
@@ -228,6 +337,11 @@ function matchPathExistance(expression: Expression): Stage {
     const initializer = new MoveHeadToVariable(path.nodes[0].name);
     const steps = matchSteps(path, false);
     return {
+        stageName: () => 'match_path_existance',
+        stageChildren(): QueryPlanStage[] {
+            return [initializer, ...steps];
+        },
+        stageData: () => null,
         execute(state: State): void {
             state.matches = state.matches.filter(match => {
                 const matches = expandMatch(initializer, steps, match, state.graph, true);
@@ -240,6 +354,21 @@ function matchPathExistance(expression: Expression): Stage {
 class MatchNode extends MatchStep {
     constructor(readonly node: ASTNode, readonly allowNewVariables: boolean) {
         super();
+    }
+
+    override stageName(): string {
+        return 'match_node';
+    }
+
+    override stageChildren(): QueryPlanStage[] {
+        return [];
+    }
+
+    override stageData(): QueryPlanStageData {
+        const n = this.node;
+        return [['name', n.name],
+                ['label', n.label === null ? null : formatLabelExpression(n.label)],
+                ['properties', n.properties === null ? null : formatMapLiteral(n.properties)]];
     }
 
     override match(graph: Graph<Value>, pos: PathMatch): PathMatch[] {
@@ -272,6 +401,23 @@ class MatchNode extends MatchStep {
 class MatchEdge extends MatchStep {
     constructor(readonly edge: ASTEdge, readonly allowNewVariables: boolean) {
         super();
+    }
+
+    override stageName(): string {
+        return 'match_edge';
+    }
+
+    override stageChildren(): QueryPlanStage[] {
+        return [];
+    }
+
+    override stageData(): QueryPlanStageData {
+        const e = this.edge;
+        return [['name', e.name],
+                ['direction', e.direction === 'NONE' ? null : e.direction],
+                ['label', e.label === null ? null : formatLabelExpression(e.label)],
+                ['properties', e.properties === null ? null : formatMapLiteral(e.properties)],
+                ['quantifier', e.quantifier === null ? null : JSON.stringify(e.quantifier)]];
     }
 
     override match(graph: Graph<Value>, pos: PathMatch): PathMatch[] {
@@ -317,6 +463,18 @@ class MatchEdge extends MatchStep {
 class MatchQuantified extends MatchStep {
     constructor(readonly inner: MatchStep, readonly min: number, readonly max: number, readonly freeVariables: Set<string>) {
         super();
+    }
+
+    override stageName(): string {
+        return 'match_quantified';
+    }
+
+    override stageChildren(): QueryPlanStage[] {
+        return [this.inner];
+    }
+
+    override stageData(): Array<[string, string]> {
+        return [['min', this.min.toString()], ['max', this.max.toString()]];
     }
 
     override match(graph: Graph<Value>, pos: PathMatch): PathMatch[] {
@@ -411,6 +569,11 @@ function planReadPath(path: Path): Stage {
     const steps = matchSteps(path, true);
     const initializer: MatchInitializer = new ScanGraph();
     return {
+        stageName: () => 'read_path',
+        stageChildren(): QueryPlanStage[] {
+            return [initializer, ...steps];
+        },
+        stageData: () => null,
         execute(state: State): void {
             const matches: Match[] = [];
             for (const match of state.matches) {
@@ -436,6 +599,9 @@ function planCreate(create: Create): Stage {
         }
     }
     return {
+        stageName: () => 'create',
+        stageChildren: () => [],
+        stageData: () => formatPath(create.path),
         execute(state: State): void {
             state.graph = state.graph.withMutations(mutation => {
                 for (const match of state.matches) {
@@ -494,6 +660,9 @@ function planCreate(create: Create): Stage {
 
 function planDelete(delete_: Delete): Stage {
     return {
+        stageName: () => 'delete',
+        stageChildren: () => [],
+        stageData: () => quoteIdentifier(delete_.name),
         execute(state: State): void {
             state.graph = state.graph.withMutations(m => {
                 for (const match of state.matches) {
@@ -557,6 +726,11 @@ function evaluate(expression: Expression, variables: Match, graph: Graph<Value>)
 
 function planReturn(returnClause: ReturnClause): Stage {
     return ({
+        stageName: () => 'return',
+        stageChildren: () => [],
+        stageData(): QueryPlanStageData {
+            return returnClause.values.map(formatExpression);
+        },
         execute(state: State): void {
             state.returnValue = state.matches.map(m => returnClause.values.map(e => evaluate(e, m, state.graph)));
         }
@@ -577,6 +751,9 @@ export function planQuery(query: ASTQuery): QueryPlan {
     let nextNodeID = 0;
     let nextEdgeID = 0;
     return {
+        stages: () => {
+            return stages;
+        },
         execute: (graph: Graph<Value>) => {
             const state = {
                 graph,

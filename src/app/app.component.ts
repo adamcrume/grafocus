@@ -30,7 +30,7 @@ import {HelpDialogComponent} from './help-dialog/help-dialog.component';
 import {MessageDialogComponent, MessageDialogInput} from './message-dialog/message-dialog.component';
 import {ElementDefinition, SavedData, Stylesheet, validateSavedData} from './models';
 import {planQuery, QueryPlan} from './gql/engine';
-import {parseQuery} from './gql/parser';
+import {quoteIdentifier, parseQuery} from './gql/parser';
 import {Graph, Node, Edge, SerializedGraph} from './gql/graph';
 import {ListType, NUMBER} from './gql/types';
 import {checkCastString, deserializeValue, isList, isNumber, numberList, primitiveValue, serializeValue, stringValue, tryCastNumber, valueType, Value} from './gql/values';
@@ -44,13 +44,6 @@ const GAP_PROPERTY = 'gap';
 
 function svgUrl(svgContent: string) {
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(svgContent);
-}
-
-function quoteIdentifier(id: string): string {
-    if (/^[_a-zA-Z][_a-zA-Z0-9]*$/.test(id)) {
-        return id;
-    }
-    return '`' + id.replaceAll(/([\\`])/g, '\\$1') + '`';
 }
 
 function classArray(classes: string|string[]|undefined): string[] {
