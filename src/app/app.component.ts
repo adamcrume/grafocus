@@ -25,6 +25,7 @@ import * as fcose from 'cytoscape-fcose';
 import Immutable from 'immutable';
 import {unionFind, UnionFind} from './union-find';
 import {parseClasses} from './util';
+import {CreateEdgeDialogComponent, CreateEdgeDialogInput, CreateEdgeDialogOutput} from './create-edge-dialog/create-edge-dialog.component';
 import {CreateNodeDialogComponent, CreateNodeDialogInput, CreateNodeDialogOutput} from './create-node-dialog/create-node-dialog.component';
 import {HelpDialogComponent} from './help-dialog/help-dialog.component';
 import {MessageDialogComponent, MessageDialogInput} from './message-dialog/message-dialog.component';
@@ -438,7 +439,7 @@ export class AppComponent implements OnInit, OnDestroy {
                                 const classes = parseClasses(result.classes);
                                 this.cachedClasses = undefined;
                                 this.originalGraph = this.originalGraph.createNode(
-                                    result.id, classes.map(c => `user_data_${c}`),
+                                    result.id, classes,
                                     [['label', primitiveValue(result.label)], ['position', numberList([position.x, position.y])]]
                                 );
                                 this.transformGraph();
@@ -530,11 +531,27 @@ export class AppComponent implements OnInit, OnDestroy {
                         const sourceID = e.target.id();
                         cy.nodes().once('click', (e2: cytoscape.EventObject) => {
                             const targetID = e2.target.id();
-                            const id = this.generateID(sourceID + '_to_' + targetID);
-                            this.cachedClasses = undefined;
-                            this.originalGraph = this.originalGraph.createEdge(id, sourceID, targetID);
-                            this.transformGraph();
-                            this.updateCustomData();
+                            const input: CreateEdgeDialogInput = {
+                                id: this.generateID(sourceID + '_to_' + targetID),
+                                sourceID,
+                                targetID,
+                            };
+                            const dialogRef = this.dialog.open(CreateEdgeDialogComponent, {data: input});
+                            dialogRef.afterClosed().subscribe((result: CreateEdgeDialogOutput) => {
+                                if (result) {
+                                    const classes = parseClasses(result.classes);
+                                    this.cachedClasses = undefined;
+                                    this.originalGraph = this.originalGraph.createEdge(
+                                        result.id,
+                                        sourceID,
+                                        targetID,
+                                        classes,
+                                        [['label', primitiveValue(result.label)]]
+                                    );
+                                    this.transformGraph();
+                                    this.updateCustomData();
+                                }
+                            });
                         });
                     },
                 },
