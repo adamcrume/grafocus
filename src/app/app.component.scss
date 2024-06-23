@@ -27,6 +27,10 @@ mat-sidenav-container {
     height: calc(100% - 64px);
 }
 
+mat-sidenav {
+    max-width: 25%;
+}
+
 .spacer {
     flex: 1;
 }
