@@ -24,6 +24,10 @@ export const schema = {
             type: 'array',
             items: {$ref: '#/$defs/Stylesheet'},
         },
+        transformations: {
+            type: 'array',
+            items: {$ref: '#/$defs/Transformation'},
+        },
     },
     required: [
         'data',
@@ -84,6 +88,14 @@ export const schema = {
             },
             required: ['selector', 'style'],
             additionalProperties: false,
+        },
+        Transformation: {
+            type: 'object',
+            properties: {
+                name: {type: 'string'},
+                query: {type: 'string'},
+            },
+            required: ['name', 'query'],
         },
     },
 };

@@ -532,5 +532,19 @@
         "background-opacity": 0
       }
     }
+  ],
+  "transformations": [
+    {
+      "name": "Hide shard 1",
+      "query": "MATCH (n:shard_1) DELETE n"
+    },
+    {
+      "name": "Hide shard 2",
+      "query": "MATCH (n:shard_2) DELETE n"
+    },
+    {
+      "name": "Add users",
+      "query": "MATCH (c:client) CREATE (:user {label: 'User'})-->(c)"
+    }
   ]
 }

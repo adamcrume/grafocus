@@ -92,15 +92,18 @@
             </mat-panel-title>
           </mat-expansion-panel-header>
           <mat-chip-set class="mat-mdc-chip-set-stacked">
-            <mat-chip
+            <mat-chip-option
               *ngFor="let transformation of transformations"
+              #toggle
               matTooltip="{{transformation.query}}"
+              [selected]="transformation.enabled"
+              (click)="toggleTransformation(transformation, toggle.selected)"
               (removed)="removeTransformation(transformation)">
               {{transformation.name}}
               <button matChipRemove>
                 <mat-icon>cancel</mat-icon>
               </button>
-            </mat-chip>
+            </mat-chip-option>
           </mat-chip-set>
           <form #transformationForm="ngForm">
           <mat-form-field class="query-field">

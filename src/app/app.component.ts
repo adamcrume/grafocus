@@ -208,6 +208,16 @@ interface Transformation {
     name: string,
     query: string,
     queryPlan: QueryPlan,
+    enabled: boolean,
+}
+
+function createTransformation(name: string, query: string, enabled: boolean = false): Transformation {
+    return {
+        name,
+        query,
+        queryPlan: planQuery(parseQuery(query)),
+        enabled,
+    };
 }
 
 class MenuUpdater {
@@ -394,6 +404,8 @@ export class AppComponent implements OnInit, OnDestroy {
         this.originalGraph = Graph.deserialize(parsed.graph, deserializeValue);
         this.cachedClasses = undefined;
         this.style = parsed.style;
+        this.transformations = (parsed.transformations || [])
+                                   .map(({name, query}) => createTransformation(name, query));
         this.transformedGraph = this.transform(this.originalGraph);
         this.updateCustomData();
         this.init();
@@ -653,6 +665,7 @@ export class AppComponent implements OnInit, OnDestroy {
             data: this.data,
             graph: this.originalGraph.serialize(serializeValue),
             style: this.style,
+            transformations: this.transformations.map(t => ({name: t.name, query: t.query})),
         }, null, 2) + '\n';
         try {
             validateSavedData(JSON.parse(this.customData));
@@ -671,8 +684,10 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     private transform(graph: Graph<Value>): Graph<Value> {
-        for(const transformation of this.transformations) {
-            graph = transformation.queryPlan.execute(graph).graph;
+        for (const transformation of this.transformations) {
+            if (transformation.enabled) {
+                graph = transformation.queryPlan.execute(graph).graph;
+            }
         }
         return graph;
     }
@@ -891,12 +906,9 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     addTransformation(name: string, query: string) {
-        this.transformations.push({
-            name,
-            query,
-            queryPlan: planQuery(parseQuery(query)),
-        });
+        this.transformations.push(createTransformation(name, query, true));
         this.transformGraph();
+        this.updateCustomData();
         this.layout(); // TODO: should we do this?
     }
 
@@ -904,6 +916,7 @@ export class AppComponent implements OnInit, OnDestroy {
         const ix = this.transformations.indexOf(transformation);
         this.transformations.splice(ix, 1);
         this.transformGraph();
+        this.updateCustomData();
         this.layout(); // TODO: should we do this?
     }
 
@@ -1056,5 +1069,11 @@ export class AppComponent implements OnInit, OnDestroy {
 
     help() {
         this.dialog.open(HelpDialogComponent);
+    }
+
+    toggleTransformation(transformation: Transformation, value: boolean) {
+        transformation.enabled = value;
+        this.transformGraph();
+        this.layout();
     }
 }

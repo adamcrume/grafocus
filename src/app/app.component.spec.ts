@@ -27,6 +27,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatToolbarModule } from '@angular/material/toolbar';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { AppComponent } from './app.component';
 import { AppComponentHarness } from './app.component.harness';
@@ -57,6 +58,7 @@ describe('AppComponent', () => {
         MatSidenavModule,
         MatSlideToggleModule,
         MatToolbarModule,
+        MatTooltipModule,
         NoopAnimationsModule,
       ],
     }).compileComponents();

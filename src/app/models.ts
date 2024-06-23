@@ -51,10 +51,16 @@ interface GraphData {
     description?: string,
 }
 
+interface Transformation {
+    name: string,
+    query: string,
+}
+
 export interface SavedData {
     data: GraphData,
     graph: SerializedGraph,
     style: Stylesheet[],
+    transformations?: Transformation[],
 }
 
 export const ID_REGEX_PART: string = '[_a-zA-Z][-_a-zA-Z0-9]*';
