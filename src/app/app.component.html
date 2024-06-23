@@ -91,14 +91,19 @@
               Transformations ({{transformations.length}})
             </mat-panel-title>
           </mat-expansion-panel-header>
-          <mat-chip-set class="mat-mdc-chip-set-stacked">
+          <mat-chip-set
+            class="mat-mdc-chip-set-stacked"
+            cdkDropList
+            (cdkDropListDropped)="transformationMoved($event)">
             <mat-chip-option
               *ngFor="let transformation of transformations"
               #toggle
               matTooltip="{{transformation.query}}"
+              cdkDrag
               [selected]="transformation.enabled"
               (click)="toggleTransformation(transformation, toggle.selected)"
               (removed)="removeTransformation(transformation)">
+              <mat-chip-option disabled *cdkDragPlaceholder></mat-chip-option>
               {{transformation.name}}
               <button matChipRemove>
                 <mat-icon>cancel</mat-icon>

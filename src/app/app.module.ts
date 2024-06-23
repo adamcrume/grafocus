@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import { DragDropModule } from '@angular/cdk/drag-drop';
 import { NgModule } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -51,6 +52,7 @@ import { HelpDialogComponent } from './help-dialog/help-dialog.component';
   imports: [
     BrowserModule,
     BrowserAnimationsModule,
+    DragDropModule,
     GqlQueryValidatorDirective,
     FormsModule,
     MatButtonModule,

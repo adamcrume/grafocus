@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import {CdkDragDrop, moveItemInArray} from '@angular/cdk/drag-drop';
 import {Component, Directive, ElementRef, OnDestroy, OnInit, ViewChild} from '@angular/core';
 import {AbstractControl, NG_VALIDATORS, Validator, ValidationErrors} from '@angular/forms';
 import {MatDialog} from '@angular/material/dialog';
@@ -1075,5 +1076,12 @@ export class AppComponent implements OnInit, OnDestroy {
         transformation.enabled = value;
         this.transformGraph();
         this.layout();
+    }
+
+    transformationMoved(event: CdkDragDrop<unknown>) {
+        moveItemInArray(this.transformations, event.previousIndex, event.currentIndex);
+        this.transformGraph();
+        this.updateCustomData();
+        this.layout(); // TODO: should we do this?
     }
 }
