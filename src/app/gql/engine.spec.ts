@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {describeQueryPlan, planQuery} from './engine';
+import {describeQueryPlan, planQuery, QueryOptions} from './engine';
 import {Edge, Graph, Node} from './graph';
 import {NUMBER} from './types';
 import {checkCastEdgeRef, checkCastList, checkCastNodeRef, checkCastString, numberValue, stringValue, tryCastList, tryCastNodeRef, tryCastEdgeRef, Value} from './values';
@@ -63,8 +63,8 @@ function sortedNodeRows(result: Value[][]|undefined): string[][] {
     return sortStringArrays(nodeRows(result));
 }
 
-function executeQuery(query: string, graph: Graph<Value>): {graph: Graph<Value>, data: string[][]} {
-    const {graph: graph2, data} = planQuery(parseQuery(query)).execute(graph);
+function executeQuery(query: string, graph: Graph<Value>, options?: QueryOptions): {graph: Graph<Value>, data: string[][]} {
+    const {graph: graph2, data} = planQuery(parseQuery(query), options).execute(graph);
     return {graph: graph2, data: sortedNodeRows(data)};
 }
 
@@ -483,6 +483,26 @@ describe('execute', () => {
         expect(executeQuery(query, graph).data).toEqual([
             ['n3'],
         ]);
+    });
+
+    it('counts nodes visited', () => {
+        const graph = newGraph()
+            .createNode('n1')
+            .createNode('n2')
+            .createNode('n3')
+            .createNode('n4');
+        const query = 'match (x) return x';
+        expect(planQuery(parseQuery(query)).execute(graph).stats).toEqual(jasmine.objectContaining({nodesVisited: 4}));
+    });
+
+    it('can limit by node visit count', () => {
+        const graph = newGraph()
+            .createNode('n1')
+            .createNode('n2')
+            .createNode('n3')
+            .createNode('n4');
+        const query = 'match (x) return x';
+        expect(() => executeQuery(query, graph, {maxNodeVisits: 2}).data).toThrowError(/Too many/);
     });
 
     it('can create', () => {

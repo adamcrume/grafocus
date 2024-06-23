@@ -20,9 +20,14 @@ import {Edge, Graph, GraphMutation, Node} from './graph';
 import {Create, Direction, Edge as ASTEdge, Expression, Delete, LabelExpression, Node as ASTNode, Path, Query as ASTQuery, ReadClause, RemoveClause, ReturnClause, SetClause, UpdateClause} from './parser';
 import {booleanValue, checkCastNodeRef, EdgeRef, edgeRefValue, listValue, NodeRef, nodeRefValue, numberValue, serializeValue, stringValue, tryCastBoolean, tryCastEdgeRef, tryCastNodeRef, Value} from './values';
 
+export interface QueryStats {
+    nodesVisited: number,
+}
+
 export interface ExecuteQueryResult {
     graph: Graph<Value>,
     data: Array<Array<Value>>|undefined,
+    stats: QueryStats,
 }
 
 export interface QueryPlan {
@@ -185,12 +190,17 @@ function joinMatches(left: Match[], right: Match[]): Match[] {
     return result;
 }
 
+interface QueryStatsState {
+    countNodeVisit: () => void,
+}
+
 interface State {
     graph: Graph<Value>,
     matches: Match[],
     returnValue: Array<Array<Value>>|undefined,
     createNodeID: () => string,
     createEdgeID: () => string,
+    queryStats: QueryStatsState,
 }
 
 interface Stage extends QueryPlanStage {
@@ -198,11 +208,11 @@ interface Stage extends QueryPlanStage {
 }
 
 interface Stagelet extends QueryPlanStage {
-    execute(matches: Match[], graph: Graph<Value>): Match[];
+    execute(matches: Match[], graph: Graph<Value>, queryStats: QueryStatsState): Match[];
 }
 
 interface WhereStagelet extends QueryPlanStage {
-    execute(previousMatches: Match[], matches: Match[], graph: Graph<Value>): Match[];
+    execute(previousMatches: Match[], matches: Match[], graph: Graph<Value>, queryStats: QueryStatsState): Match[];
 }
 
 function labelsMatch(labels: Immutable.Set<string>, pattern: LabelExpression): boolean {
@@ -233,7 +243,8 @@ function valueMatches(value: Value|undefined, pattern: Expression): boolean {
     return value?.value === pattern.value;
 }
 
-function nodeMatches(node: Node<Value>, pattern: ASTNode): boolean {
+function nodeMatches(node: Node<Value>, pattern: ASTNode, queryStats: QueryStatsState): boolean {
+    queryStats.countNodeVisit();
     if (pattern.label !== null) {
         if (!labelsMatch(node.labels, pattern.label)) {
             return false;
@@ -277,7 +288,7 @@ abstract class MatchStep implements QueryPlanStage {
     abstract stageName(): string;
     abstract stageChildren(): QueryPlanStage[];
     abstract stageData(): QueryPlanStageData;
-    abstract match(graph: Graph<Value>, pos: PathMatch): PathMatch[];
+    abstract match(graph: Graph<Value>, pos: PathMatch, queryStats: QueryStatsState): PathMatch[];
 }
 
 abstract class MatchInitializer implements QueryPlanStage {
@@ -481,9 +492,9 @@ function matchPathExistence(expression: Expression): WhereStagelet {
                 return [initializer, ...steps];
             },
             stageData: () => null,
-            execute(previousMatches: Match[], matches: Match[], graph: Graph<Value>): Match[] {
+            execute(previousMatches: Match[], matches: Match[], graph: Graph<Value>, queryStats: QueryStatsState): Match[] {
                 return matches.filter(match => {
-                    const matches = expandMatch(initializer, steps, match, graph);
+                    const matches = expandMatch(initializer, steps, match, graph, queryStats);
                     const foundMatch = !matches.next().done;
                     return foundMatch !== inverted;
                 });
@@ -501,8 +512,8 @@ function matchPathExistence(expression: Expression): WhereStagelet {
             }];
         },
         stageData: () => null,
-        execute(previousMatches: Match[], matches: Match[], graph: Graph<Value>): Match[] {
-            const newMatches = stagelet.execute(previousMatches, graph);
+        execute(previousMatches: Match[], matches: Match[], graph: Graph<Value>, queryStats: QueryStatsState): Match[] {
+            const newMatches = stagelet.execute(previousMatches, graph, queryStats);
             return joinMatches(newMatches, matches);
         },
     };
@@ -528,8 +539,8 @@ class MatchNode extends MatchStep {
                 ['properties', n.properties === null ? null : formatMapLiteral(n.properties)]];
     }
 
-    override match(graph: Graph<Value>, pos: PathMatch): PathMatch[] {
-        if (!nodeMatches(pos.head, this.node)) {
+    override match(graph: Graph<Value>, pos: PathMatch, queryStats: QueryStatsState): PathMatch[] {
+        if (!nodeMatches(pos.head, this.node, queryStats)) {
             return [];
         }
         const name = this.node.name;
@@ -577,7 +588,7 @@ class MatchEdge extends MatchStep {
                 ['quantifier', e.quantifier === null ? null : JSON.stringify(e.quantifier)]];
     }
 
-    override match(graph: Graph<Value>, pos: PathMatch): PathMatch[] {
+    override match(graph: Graph<Value>, pos: PathMatch, queryStats: QueryStatsState): PathMatch[] {
         const matches = [];
         const edges = [];
         for (const [edge, next] of graph.outgoingNeighbors(pos.head)) {
@@ -634,7 +645,7 @@ class MatchQuantified extends MatchStep {
         return [['min', this.min.toString()], ['max', this.max.toString()]];
     }
 
-    override match(graph: Graph<Value>, pos: PathMatch): PathMatch[] {
+    override match(graph: Graph<Value>, pos: PathMatch, queryStats: QueryStatsState): PathMatch[] {
         const result = [];
         const emptyVariables = new Map<string, Array<Value>>();
         for (const k of this.freeVariables) {
@@ -656,7 +667,7 @@ class MatchQuantified extends MatchStep {
                     match: scope,
                     head: p.pathMatch.head,
                     traversedEdges: p.pathMatch.traversedEdges,
-                });
+                }, queryStats);
                 newMatches.push(innerMatches.map(m => {
                     const variables = new Map(p.variables);
                     for (const [k, v] of m.match.vars) {
@@ -710,7 +721,7 @@ function matchSteps(path: Path, allowNewVariables: boolean): MatchStep[] {
     return steps;
 }
 
-function* expandMatch(initializer: MatchInitializer, steps: MatchStep[], match: Match, graph: Graph<Value>): IterableIterator<Match> {
+function* expandMatch(initializer: MatchInitializer, steps: MatchStep[], match: Match, graph: Graph<Value>, queryStats: QueryStatsState): IterableIterator<Match> {
     interface Submatch {
         pathMatch: PathMatch,
         step: number,
@@ -727,7 +738,7 @@ function* expandMatch(initializer: MatchInitializer, steps: MatchStep[], match: 
             yield submatch.pathMatch.match;
         } else {
             submatches.push(...steps[submatch.step]
-                .match(graph, submatch.pathMatch)
+                .match(graph, submatch.pathMatch, queryStats)
                 .map(p => ({pathMatch: p, step: submatch.step + 1})));
         }
     }
@@ -764,10 +775,10 @@ function planReadPath(path: Path): Stagelet {
             return [initializer, ...steps];
         },
         stageData: () => null,
-        execute(stateMatches: Match[], graph: Graph<Value>): Match[] {
+        execute(stateMatches: Match[], graph: Graph<Value>, queryStats: QueryStatsState): Match[] {
             const matches: Match[] = [];
             for (const match of stateMatches) {
-                matches.push(...expandMatch(initializer, steps, match, graph));
+                matches.push(...expandMatch(initializer, steps, match, graph, queryStats));
             }
             return matches;
         }
@@ -790,10 +801,10 @@ function planRead(read: ReadClause): Stage {
         execute(state: State): void {
             let matches = state.matches;
             for (const stage of stages) {
-                matches = stage.execute(matches, state.graph);
+                matches = stage.execute(matches, state.graph, state.queryStats);
             }
             if (where) {
-                matches = where.execute(state.matches, matches, state.graph);
+                matches = where.execute(state.matches, matches, state.graph, state.queryStats);
             }
             state.matches = matches;
         }
@@ -869,7 +880,7 @@ function planCreate(create: Create): Stage {
                             return nodeRef;
                         }
                         let properties: Array<[string, Value]> = n.properties.map(([k, v]) => {
-                            return [k, v(match, state.graph)];
+                            return [k, v(match, state.graph, state.queryStats)];
                         });
                         const id = state.createNodeID();
                         mutation.createNode(id, n.labels, properties);
@@ -880,7 +891,7 @@ function planCreate(create: Create): Stage {
                         const srcID = nodeIDs[e.srcOffset + i];
                         const dstID = nodeIDs[e.dstOffset + i];
                         let properties: Array<[string, Value]> = e.properties.map(([k, v]) => {
-                            return [k, v(match, state.graph)];
+                            return [k, v(match, state.graph, state.queryStats)];
                         });
                         const edgeID = state.createEdgeID();
                         mutation.createEdge(edgeID, srcID, dstID, e.labels, properties);
@@ -929,20 +940,20 @@ function planSet(set_: SetClause): Stage {
             const variable = item.property.root;
             const property = item.property.chain[0];
             const expression = planEvaluate(item.expression);
-            return (match: Match, graph: Graph<Value>, m: GraphMutation<Value>) => {
+            return (match: Match, graph: Graph<Value>, m: GraphMutation<Value>, queryStats: QueryStatsState) => {
                 const value = match.get(variable);
                 if (!value) {
                     throw new Error(`variable ${JSON.stringify(variable)} not defined`);
                 }
                 const nodeRef = tryCastNodeRef(value);
                 if (nodeRef !== undefined) {
-                    const v = expression(match, graph);
+                    const v = expression(match, graph, queryStats);
                     m.updateNodeProperties(nodeRef, p => p.set(property, v));
                     return;
                 }
                 const edgeRef = tryCastEdgeRef(value);
                 if (edgeRef !== undefined) {
-                    const v = expression(match, graph);
+                    const v = expression(match, graph, queryStats);
                     m.updateEdgeProperties(edgeRef, p => p.set(property, v));
                     return;
                 }
@@ -984,7 +995,7 @@ function planSet(set_: SetClause): Stage {
             state.graph = state.graph.withMutations(m => {
                 for (const match of state.matches) {
                     for (const item of items) {
-                        item(match, state.graph, m);
+                        item(match, state.graph, m, state.queryStats);
                     }
                 }
             });
@@ -1073,7 +1084,7 @@ function planUpdate(update: UpdateClause): Stage {
     }
 }
 
-type EvaluatePlan = (variables: Match, graph: Graph<Value>) => Value;
+type EvaluatePlan = (variables: Match, graph: Graph<Value>, queryStats: QueryStatsState) => Value;
 
 function planEvaluate(expression: Expression): EvaluatePlan {
     if (expression.kind === 'string') {
@@ -1092,9 +1103,9 @@ function planEvaluate(expression: Expression): EvaluatePlan {
         };
     } else if (expression.kind === 'not') {
         const inner = planEvaluate(expression.value);
-        return (variables: Match, graph: Graph<Value>) => {
+        return (variables: Match, graph: Graph<Value>, queryStats: QueryStatsState) => {
             // TODO: test
-            const b = tryCastBoolean(inner(variables, graph));
+            const b = tryCastBoolean(inner(variables, graph, queryStats));
             if (b === undefined) {
                 throw new Error(`Expression is not a boolean: ${JSON.stringify(expression.value)}`);
             }
@@ -1105,8 +1116,8 @@ function planEvaluate(expression: Expression): EvaluatePlan {
         const steps = matchSteps(expression.value, false);
         // TODO: choose better
         const initializer = new ScanGraph();
-        return (variables: Match, graph: Graph<Value>) => {
-            const matches = expandMatch(initializer, steps, variables, graph);
+        return (variables: Match, graph: Graph<Value>, queryStats: QueryStatsState) => {
+            const matches = expandMatch(initializer, steps, variables, graph, queryStats);
             const foundMatch = !matches.next().done;
             return booleanValue(foundMatch);
         };
@@ -1124,12 +1135,18 @@ function planReturn(returnClause: ReturnClause): Stage {
             return returnClause.values.map(formatExpression);
         },
         execute(state: State): void {
-            state.returnValue = state.matches.map(m => expressions.map(e => e(m, state.graph)));
+            state.returnValue = state.matches.map(m => expressions.map(e => e(m, state.graph, state.queryStats)));
         }
     });
 }
 
-export function planQuery(query: ASTQuery): QueryPlan {
+const DEFAULT_MAX_NODE_VISITS = 1000;
+
+export interface QueryOptions {
+    maxNodeVisits?: number,
+}
+
+export function planQuery(query: ASTQuery, options?: QueryOptions): QueryPlan {
     const stages: Array<Stage> = [];
     for (const read of query.reads) {
         stages.push(planRead(read));
@@ -1142,6 +1159,8 @@ export function planQuery(query: ASTQuery): QueryPlan {
     }
     let nextNodeID = 0;
     let nextEdgeID = 0;
+    let nodesVisited = 0;
+    const maxNodeVisits = options?.maxNodeVisits ?? DEFAULT_MAX_NODE_VISITS;
     return {
         stages: () => {
             return stages;
@@ -1169,6 +1188,13 @@ export function planQuery(query: ASTQuery): QueryPlan {
                         }
                     }
                 },
+                queryStats: {
+                    countNodeVisit: () => {
+                        if (++nodesVisited > maxNodeVisits) {
+                            throw new Error(`Too many nodes visited (options.maxNodeVisits = ${maxNodeVisits})`);
+                        }
+                    },
+                },
             };
             for (const stage of stages) {
                 stage.execute(state);
@@ -1176,6 +1202,9 @@ export function planQuery(query: ASTQuery): QueryPlan {
             return {
                 graph: state.graph,
                 data: state.returnValue,
+                stats: {
+                    nodesVisited,
+                },
             };
         },
     };
