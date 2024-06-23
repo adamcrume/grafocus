@@ -375,8 +375,9 @@ function matchPathExistance(expression: Expression): Stage {
         stageData: () => null,
         execute(state: State): void {
             state.matches = state.matches.filter(match => {
-                const matches = expandMatch(initializer, steps, match, state.graph, true);
-                return matches.length > 0 !== inverted;
+                const matches = expandMatch(initializer, steps, match, state.graph);
+                const foundMatch = !matches.next().done;
+                return foundMatch !== inverted;
             });
         }
     };
@@ -584,16 +585,27 @@ function matchSteps(path: Path, allowNewVariables: boolean): MatchStep[] {
     return steps;
 }
 
-function expandMatch(initializer: MatchInitializer, steps: MatchStep[], match: Match, graph: Graph<Value>, stopAtFirst: boolean): Match[] {
-    let pathMatches = initializer.initial(match, graph);
-    for (const step of steps) {
-        const stepMatches: PathMatch[] = [];
-        for (const pathMatch of pathMatches) {
-            stepMatches.push(...step.match(graph, pathMatch));
-        }
-        pathMatches = stepMatches;
+function* expandMatch(initializer: MatchInitializer, steps: MatchStep[], match: Match, graph: Graph<Value>): IterableIterator<Match> {
+    interface Submatch {
+        pathMatch: PathMatch,
+        step: number,
     }
-    return pathMatches.map(p => p.match);
+    let submatches = initializer
+        .initial(match, graph)
+        .map(p => ({pathMatch: p, step: 0}));
+    while (true) {
+        const submatch = submatches.pop();
+        if (!submatch) {
+            return;
+        }
+        if (submatch.step == steps.length) {
+            yield submatch.pathMatch.match;
+        } else {
+            submatches.push(...steps[submatch.step]
+                .match(graph, submatch.pathMatch)
+                .map(p => ({pathMatch: p, step: submatch.step + 1})));
+        }
+    }
 }
 
 function planReadPath(path: Path): Stage {
@@ -608,7 +620,7 @@ function planReadPath(path: Path): Stage {
         execute(state: State): void {
             const matches: Match[] = [];
             for (const match of state.matches) {
-                matches.push(...expandMatch(initializer, steps, match, state.graph, false));
+                matches.push(...expandMatch(initializer, steps, match, state.graph));
             }
             state.matches = matches;
         }
@@ -929,7 +941,9 @@ function planEvaluate(expression: Expression): EvaluatePlan {
         // TODO: choose better
         const initializer = new ScanGraph();
         return (variables: Match, graph: Graph<Value>) => {
-            return booleanValue(expandMatch(initializer, steps, variables, graph, true).length > 0);
+            const matches = expandMatch(initializer, steps, variables, graph);
+            const foundMatch = !matches.next().done;
+            return booleanValue(foundMatch);
         };
     } else {
         throw new Error(`Unrecognized expression: ${JSON.stringify(expression)}`);
