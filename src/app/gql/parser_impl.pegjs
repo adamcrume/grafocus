@@ -87,7 +87,15 @@ setProperty = p:propertyExpression sp "=" sp e:expression {
   }
 }
 
-setItem = setProperty
+setLabels = variable:identifier labels:(sp ":" sp @identifier)+ {
+  return {
+    kind: 'setLabels',
+    variable,
+    labels,
+  }
+}
+
+setItem = setProperty / setLabels
 
 set = "set"i sp items:setItem|1.., sp "," sp| {
   return {

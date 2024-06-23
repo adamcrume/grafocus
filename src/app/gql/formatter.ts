@@ -171,12 +171,16 @@ export function formatExpression(e: Expression): string {
 }
 
 export function formatSetItem(i: SetItem): string {
-    let result = i.property.root;
-    for (const name of i.property.chain) {
-        result += '.';
-        result += name;
+    if (i.kind === 'setProperty') {
+        let result = i.property.root;
+        for (const name of i.property.chain) {
+            result += '.';
+            result += name;
+        }
+        result += '=';
+        result += formatExpression(i.expression);
+        return result;
+    } else {
+        return i.variable + ':' + i.labels.join(':');
     }
-    result += '=';
-    result += formatExpression(i.expression);
-    return result;
 }

@@ -61,7 +61,13 @@ export interface SetProperty {
     expression: Expression,
 }
 
-export type SetItem = SetProperty;
+export interface SetLabels {
+    kind: 'setLabels',
+    variable: string,
+    labels: string[],
+}
+
+export type SetItem = SetProperty | SetLabels;
 
 export interface SetClause extends Clause {
     kind: 'set',

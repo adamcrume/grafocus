@@ -387,4 +387,28 @@ describe('execute', () => {
         }
         expect(checkCastString(e1.properties.get('label'))).toEqual('test');
     });
+
+    it('can set node labels', () => {
+        const {graph} = executeQuery('match (x) set x:label',
+                                     newGraph()
+                                         .createNode('x', ['foo']));
+        const x = graph.getNodeByID('x');
+        if (!x) {
+            throw new Error(`x not found`);
+        }
+        expect([...x.labels]).toEqual(['foo', 'label']);
+    });
+
+    it('can set edge labels', () => {
+        const {graph} = executeQuery('match (n1)-[e1]-(n2) set e1:label',
+                                     newGraph()
+                                         .createNode('n1')
+                                         .createNode('n2')
+                                         .createEdge('e1', 'n1', 'n2', ['foo']));
+        const e1 = graph.getEdgeByID('e1');
+        if (!e1) {
+            throw new Error(`e1 not found`);
+        }
+        expect([...e1.labels]).toEqual(['foo', 'label']);
+    });
 });

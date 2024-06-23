@@ -16,7 +16,7 @@
 
 import Immutable from 'immutable';
 import {formatExpression, formatLabelExpression, formatMapLiteral, formatPath, formatSetItem, quoteIdentifier} from './formatter';
-import {Edge, Graph, Node} from './graph';
+import {Edge, Graph, GraphMutation, Node} from './graph';
 import {Create, Edge as ASTEdge, Expression, Delete, LabelExpression, Node as ASTNode, Path, Query as ASTQuery, ReadClause, ReturnClause, SetClause, UpdateClause} from './parser';
 import {booleanValue, checkCastNodeRef, EdgeRef, edgeRefValue, listValue, NodeRef, nodeRefValue, numberValue, stringValue, tryCastBoolean, tryCastEdgeRef, tryCastNodeRef, Value} from './values';
 
@@ -715,14 +715,53 @@ function planDelete(delete_: Delete): Stage {
 
 function planSet(set_: SetClause): Stage {
     const items = set_.items.map(item => {
-        if (item.property.chain.length !== 1) {
-            throw new Error(`SET only supports VARIABLE.PROPERTY, with no nesting`);
+        if (item.kind === 'setProperty') {
+            if (item.property.chain.length !== 1) {
+                throw new Error(`SET only supports VARIABLE.PROPERTY, with no nesting`);
+            }
+            const variable = item.property.root;
+            const property = item.property.chain[0];
+            const expression = planEvaluate(item.expression);
+            return (match: Match, graph: Graph<Value>, m: GraphMutation<Value>) => {
+                const value = match.get(variable);
+                if (!value) {
+                    throw new Error(`variable ${JSON.stringify(variable)} not defined`);
+                }
+                const nodeRef = tryCastNodeRef(value);
+                if (nodeRef !== undefined) {
+                    const v = expression(match, graph);
+                    m.updateNodeProperties(nodeRef, p => p.set(property, v));
+                    return;
+                }
+                const edgeRef = tryCastEdgeRef(value);
+                if (edgeRef !== undefined) {
+                    const v = expression(match, graph);
+                    m.updateEdgeProperties(edgeRef, p => p.set(property, v));
+                    return;
+                }
+                throw new Error(`variable ${JSON.stringify(variable)} is not a node or edge`);
+            };
+        } else {
+            const variable = item.variable;
+            const labels = item.labels;
+            return (match: Match, graph: Graph<Value>, m: GraphMutation<Value>) => {
+                const value = match.get(variable);
+                if (!value) {
+                    throw new Error(`variable ${JSON.stringify(variable)} not defined`);
+                }
+                const nodeRef = tryCastNodeRef(value);
+                if (nodeRef !== undefined) {
+                    m.updateNodeLabels(nodeRef, s => s.union(labels));
+                    return;
+                }
+                const edgeRef = tryCastEdgeRef(value);
+                if (edgeRef !== undefined) {
+                    m.updateEdgeLabels(edgeRef, s => s.union(labels));
+                    return;
+                }
+                throw new Error(`variable ${JSON.stringify(variable)} is not a node or edge`);
+            };
         }
-        return {
-            variable: item.property.root,
-            property: item.property.chain[0],
-            expression: planEvaluate(item.expression),
-        };
     });
     return {
         stageName: () => 'set',
@@ -738,25 +777,7 @@ function planSet(set_: SetClause): Stage {
             state.graph = state.graph.withMutations(m => {
                 for (const match of state.matches) {
                     for (const item of items) {
-                        const value = match.get(item.variable);
-                        if (!value) {
-                            throw new Error(`variable ${JSON.stringify(item.variable)} not defined`);
-                        }
-                        const nodeRef = tryCastNodeRef(value);
-                        if (nodeRef !== undefined) {
-                            const k = item.property;
-                            const v = item.expression(match, state.graph);
-                            m.updateNodeProperties(nodeRef, p => p.set(k, v));
-                            continue;
-                        }
-                        const edgeRef = tryCastEdgeRef(value);
-                        if (edgeRef !== undefined) {
-                            const k = item.property;
-                            const v = item.expression(match, state.graph);
-                            m.updateEdgeProperties(edgeRef, p => p.set(k, v));
-                            continue;
-                        }
-                        throw new Error(`variable ${JSON.stringify(item.variable)} is not a node or edge`);
+                        item(match, state.graph, m);
                     }
                 }
             });
