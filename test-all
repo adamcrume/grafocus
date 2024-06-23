@@ -18,7 +18,7 @@ set -euo pipefail
 
 cd "$(readlink -f "$(dirname "$0")")"
 
-if grep -IEn '[[:space:]]+$' . -r --exclude-dir=node_modules --exclude-dir=.angular --exclude-dir=.git --exclude='*~'; then
+if grep -IEn '[[:space:]]+$' . -r --exclude-dir=node_modules --exclude-dir=.angular --exclude-dir=.git --exclude-dir=karma-firefox-profile --exclude='*~'; then
   echo "Trailing whitespace found."
   exit 1
 fi
