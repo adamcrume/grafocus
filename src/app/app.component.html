@@ -42,7 +42,7 @@
 </mat-toolbar>
 
 <mat-sidenav-container>
-  <mat-sidenav #sidenav mode="side">
+  <mat-sidenav #sidenav mode="side" opened="true">
     <div class="sidenav-content">
       <mat-form-field *ngIf="editMode">
         <mat-label>Title</mat-label>
@@ -85,7 +85,7 @@
       </div>
 
       <mat-accordion multi>
-        <mat-expansion-panel>
+        <mat-expansion-panel expanded="true">
           <mat-expansion-panel-header>
             <mat-panel-title>
               Transformations ({{transformations.length}})
@@ -135,7 +135,7 @@
           <!--   Show all -->
           <!-- </button> -->
         </mat-expansion-panel>
-        <mat-expansion-panel>
+        <mat-expansion-panel expanded="true">
           <mat-expansion-panel-header>
             <mat-panel-title>
               Selected element
@@ -158,7 +158,7 @@
             (classesAdded)="onClassesAdded($event)"
             (classesRemoved)="onClassesRemoved($event)"/>
         </mat-expansion-panel>
-        <mat-expansion-panel class="graph-definition">
+        <mat-expansion-panel class="graph-definition" expanded="true">
           <mat-expansion-panel-header>
             <mat-panel-title>
               Graph definition
