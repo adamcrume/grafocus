@@ -31,13 +31,14 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 
-import { AppComponent, GqlQueryValidatorDirective } from './app.component';
+import { AppComponent } from './app.component';
 import { ElementPropertiesComponent } from './element-properties/element-properties.component';
 import { CreateEdgeDialogComponent } from './create-edge-dialog/create-edge-dialog.component';
 import { CreateNodeDialogComponent } from './create-node-dialog/create-node-dialog.component';
 import { MultiElementPropertiesComponent } from './multi-element-properties/multi-element-properties.component';
 import { MessageDialogComponent } from './message-dialog/message-dialog.component';
 import { HelpDialogComponent } from './help-dialog/help-dialog.component';
+import { GqlQueryValidatorDirective, TransformationListComponent } from './transformation-list/transformation-list.component';
 
 @NgModule({
   declarations: [
@@ -48,6 +49,7 @@ import { HelpDialogComponent } from './help-dialog/help-dialog.component';
     MultiElementPropertiesComponent,
     MessageDialogComponent,
     HelpDialogComponent,
+    TransformationListComponent,
   ],
   imports: [
     BrowserModule,

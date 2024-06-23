@@ -15,8 +15,7 @@
  */
 
 import {CdkDragDrop, moveItemInArray} from '@angular/cdk/drag-drop';
-import {Component, Directive, ElementRef, OnDestroy, OnInit, ViewChild} from '@angular/core';
-import {AbstractControl, NG_VALIDATORS, Validator, ValidationErrors} from '@angular/forms';
+import {Component, ElementRef, OnDestroy, OnInit, ViewChild} from '@angular/core';
 import {MatDialog} from '@angular/material/dialog';
 
 import cytoscape from 'cytoscape';
@@ -31,11 +30,11 @@ import {CreateNodeDialogComponent, CreateNodeDialogInput, CreateNodeDialogOutput
 import {HelpDialogComponent} from './help-dialog/help-dialog.component';
 import {MessageDialogComponent, MessageDialogInput} from './message-dialog/message-dialog.component';
 import {ElementDefinition, SavedData, Stylesheet, validateSavedData} from './models';
-import {planQuery, QueryPlan} from './gql/engine';
-import {quoteIdentifier, parseQuery} from './gql/parser';
+import {quoteIdentifier} from './gql/parser';
 import {Graph, Node, Edge, SerializedGraph} from './gql/graph';
 import {ListType, NUMBER} from './gql/types';
 import {checkCastString, deserializeValue, isList, isNumber, numberList, primitiveValue, serializeValue, stringValue, tryCastNumber, valueType, Value} from './gql/values';
+import {createTransformation, Transformation} from './transformation';
 
 const PARENT_LABEL = '_PARENT';
 const ALIGN_VERTICAL_LABEL = '_ALIGN_VERTICAL';
@@ -205,22 +204,6 @@ function syncClasses(elt: cytoscape.CollectionReturnValue, classes: Immutable.Se
     }
 }
 
-interface Transformation {
-    name: string,
-    query: string,
-    queryPlan: QueryPlan,
-    enabled: boolean,
-}
-
-function createTransformation(name: string, query: string, enabled: boolean = false): Transformation {
-    return {
-        name,
-        query,
-        queryPlan: planQuery(parseQuery(query)),
-        enabled,
-    };
-}
-
 class MenuUpdater {
     private addedMenus: string[] = []
 
@@ -271,29 +254,6 @@ function updateMenuVisibility(menus: contextMenus.ContextMenu, editMode: boolean
     }
 }
 
-@Directive({
-    selector: '[gqlQuery]',
-    providers: [{
-        provide: NG_VALIDATORS,
-        useExisting: GqlQueryValidatorDirective,
-        multi: true,
-    }],
-    standalone: true,
-})
-export class GqlQueryValidatorDirective implements Validator {
-    validate(control: AbstractControl): ValidationErrors | null {
-        if (!control.value) {
-            return null;
-        }
-        try {
-            planQuery(parseQuery(control.value));
-            return null;
-        } catch(e: unknown) {
-            return {error: e};
-        }
-    }
-}
-
 @Component({
     selector: 'app-root',
     templateUrl: './app.component.html',
@@ -301,8 +261,6 @@ export class GqlQueryValidatorDirective implements Validator {
 })
 export class AppComponent implements OnInit, OnDestroy {
     @ViewChild('graph', {static: true}) graph!: ElementRef<HTMLElement>;
-    // must be bound to with ngModel to enable validation
-    userQuery = '';
     customData = '';
     transformations: Transformation[] = [];
     private cachedClasses: string[]|undefined = undefined;
@@ -906,21 +864,6 @@ export class AppComponent implements OnInit, OnDestroy {
         this.expandCollapseApi?.collapseAll({});
     }
 
-    addTransformation(name: string, query: string) {
-        this.transformations.push(createTransformation(name, query, true));
-        this.transformGraph();
-        this.updateCustomData();
-        this.layout(); // TODO: should we do this?
-    }
-
-    removeTransformation(transformation: Transformation) {
-        const ix = this.transformations.indexOf(transformation);
-        this.transformations.splice(ix, 1);
-        this.transformGraph();
-        this.updateCustomData();
-        this.layout(); // TODO: should we do this?
-    }
-
     private removeIdsFromAlignmentConstraint(constraint: string[][], removed: Set<string>): string[][] {
         return constraint
             .map(c => c.filter(id => !removed.has(id)))
@@ -1072,14 +1015,12 @@ export class AppComponent implements OnInit, OnDestroy {
         this.dialog.open(HelpDialogComponent);
     }
 
-    toggleTransformation(transformation: Transformation, value: boolean) {
-        transformation.enabled = value;
-        this.transformGraph();
-        this.layout();
+    addTransformation(name: string, query: string): void {
+        this.transformations = [...this.transformations, createTransformation(name, query, true)];
+        this.updateTransformations();
     }
 
-    transformationMoved(event: CdkDragDrop<unknown>) {
-        moveItemInArray(this.transformations, event.previousIndex, event.currentIndex);
+    updateTransformations(): void {
         this.transformGraph();
         this.updateCustomData();
         this.layout(); // TODO: should we do this?

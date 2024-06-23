@@ -32,6 +32,7 @@ import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { AppComponent } from './app.component';
 import { AppComponentHarness } from './app.component.harness';
 import { CytoscapeHarness } from './cytoscape.harness';
+import { TransformationListComponent } from './transformation-list/transformation-list.component';
 
 let originalRequestAnimationFrame: (callback: FrameRequestCallback) => number;
 
@@ -44,7 +45,8 @@ describe('AppComponent', () => {
 
     await TestBed.configureTestingModule({
       declarations: [
-        AppComponent
+        AppComponent,
+        TransformationListComponent,
       ],
       imports: [
         FormsModule,

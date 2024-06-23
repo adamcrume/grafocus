@@ -91,57 +91,9 @@
               Transformations ({{transformations.length}})
             </mat-panel-title>
           </mat-expansion-panel-header>
-          <mat-chip-set
-            class="mat-mdc-chip-set-stacked"
-            cdkDropList
-            (cdkDropListDropped)="transformationMoved($event)">
-            <mat-chip-option
-              *ngFor="let transformation of transformations"
-              #toggle
-              matTooltip="{{transformation.query}}"
-              cdkDrag
-              [selected]="transformation.enabled"
-              (click)="toggleTransformation(transformation, toggle.selected)"
-              (removed)="removeTransformation(transformation)">
-              <mat-chip-option disabled *cdkDragPlaceholder></mat-chip-option>
-              {{transformation.name}}
-              <button matChipRemove>
-                <mat-icon>cancel</mat-icon>
-              </button>
-            </mat-chip-option>
-          </mat-chip-set>
-          <form #transformationForm="ngForm">
-          <mat-form-field class="query-field">
-            <mat-label>New transformation</mat-label>
-            <textarea
-              matInput
-              #newTransformationField
-              gqlQuery
-              [(ngModel)]="userQuery"
-              name="transformation"
-              rows="10"></textarea>
-          </mat-form-field>
-          <mat-error *ngIf="transformationForm?.controls?.['transformation']?.errors">
-            {{
-            transformationForm?.controls?.['transformation']?.errors?.['error']
-            }}
-          </mat-error>
-          <button
-            [disabled]="!transformationForm.valid || !newTransformationField.value"
-            mat-raised-button
-            (click)="addTransformation(newTransformationField.value, newTransformationField.value); newTransformationField.value = ''">
-            Add
-            <mat-icon>add</mat-icon>
-          </button>
-          </form>
-          <!-- <button -->
-          <!--   mat-raised-button -->
-          <!--   class="show-all" -->
-          <!--   [disabled]="hiddenSelectors.length === 0" -->
-          <!--   (click)="show('')"> -->
-          <!--   <mat-icon>visibility</mat-icon> -->
-          <!--   Show all -->
-          <!-- </button> -->
+          <transformation-list
+            [transformations]="transformations"
+            (transformationsChange)="updateTransformations()"/>
         </mat-expansion-panel>
         <mat-expansion-panel expanded="true">
           <mat-expansion-panel-header>
