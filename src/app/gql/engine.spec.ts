@@ -335,6 +335,34 @@ describe('execute', () => {
         ]);
     });
 
+    it('can filter by path existence from start', () => {
+        const graph = newGraph()
+            .createNode('n1')
+            .createNode('n2')
+            .createNode('n3')
+            .createEdge('e1', 'n1', 'n2')
+            .createEdge('e2', 'n2', 'n3');
+        const query = 'match (x) where (x)-->() return x';
+        expect(executeQuery(query, graph).data).toEqual([
+            ['n1'],
+            ['n2'],
+        ]);
+    });
+
+    it('can filter by path existence from end', () => {
+        const graph = newGraph()
+            .createNode('n1')
+            .createNode('n2')
+            .createNode('n3')
+            .createEdge('e1', 'n1', 'n2')
+            .createEdge('e2', 'n2', 'n3');
+        const query = 'match (x) where ()-->(x) return x';
+        expect(executeQuery(query, graph).data).toEqual([
+            ['n2'],
+            ['n3'],
+        ]);
+    });
+
     it('can create', () => {
         const {graph} = executeQuery('create (:Foo{foo:123})-[:Bar{abc:"xyz"}]->(:Baz)', newGraph());
         const foo = [...graph.nodes].filter(n => n.labels.has('Foo'));

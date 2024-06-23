@@ -17,7 +17,7 @@
 import Immutable from 'immutable';
 import {formatExpression, formatLabelExpression, formatMapLiteral, formatPath, formatRemoveItem, formatSetItem, quoteIdentifier} from './formatter';
 import {Edge, Graph, GraphMutation, Node} from './graph';
-import {Create, Edge as ASTEdge, Expression, Delete, LabelExpression, Node as ASTNode, Path, Query as ASTQuery, ReadClause, RemoveClause, ReturnClause, SetClause, UpdateClause} from './parser';
+import {Create, Direction, Edge as ASTEdge, Expression, Delete, LabelExpression, Node as ASTNode, Path, Query as ASTQuery, ReadClause, RemoveClause, ReturnClause, SetClause, UpdateClause} from './parser';
 import {booleanValue, checkCastNodeRef, EdgeRef, edgeRefValue, listValue, NodeRef, nodeRefValue, numberValue, stringValue, tryCastBoolean, tryCastEdgeRef, tryCastNodeRef, Value} from './values';
 
 export interface ExecuteQueryResult {
@@ -320,6 +320,33 @@ class ScanGraphStep extends MatchStep {
     }
 }
 
+function reverseDirection(direction: Direction): Direction {
+    if (direction === 'LEFT') {
+        return 'RIGHT';
+    } else if (direction === 'RIGHT') {
+        return 'LEFT';
+    } else {
+        return 'NONE';
+    }
+}
+
+// Can be replaced by Array.toReversed once that's available.
+function toReversed<T>(array: T[]): T[] {
+    const out = [...array];
+    out.reverse();
+    return out;
+}
+
+function reversePath(path: Path): Path {
+    return {
+        nodes: toReversed(path.nodes),
+        edges: toReversed(path.edges).map(e => ({
+            ...e,
+            direction: reverseDirection(e.direction),
+        })),
+    };
+}
+
 function matchPathExistance(expression: Expression): Stage {
     let path: Path;
     let inverted: boolean;
@@ -332,8 +359,11 @@ function matchPathExistance(expression: Expression): Stage {
     } else {
         throw new Error(`Unimplemented WHERE clause: ${JSON.stringify(expression)}`);
     }
+    if (!path.nodes[0].name && path.nodes[path.nodes.length - 1].name) {
+        path = reversePath(path);
+    }
     if (!path.nodes[0].name) {
-        throw new Error(`WHERE clauses currently require the first node to be an existing variable`);
+        throw new Error(`WHERE clauses currently require the first node or last to be an existing variable`);
     }
     const initializer = new MoveHeadToVariable(path.nodes[0].name);
     const steps = matchSteps(path, false);

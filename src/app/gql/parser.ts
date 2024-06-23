@@ -163,9 +163,11 @@ export interface Quantifier {
     max: number,
 }
 
+export type Direction = 'LEFT'|'RIGHT'|'NONE';
+
 export interface Edge {
     name: string|null,
-    direction: 'LEFT'|'RIGHT'|'NONE',
+    direction: Direction,
     label: LabelExpression|null,
     properties: MapLiteral|null,
     quantifier: Quantifier|null,
