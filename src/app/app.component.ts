@@ -349,7 +349,6 @@ export class AppComponent implements OnInit, OnDestroy {
         cytoscape.use(expand_collapse);
         cytoscape.use(fcose);
         this.init();
-        this.updateCustomData();
     }
 
     ngOnDestroy() {
@@ -396,6 +395,7 @@ export class AppComponent implements OnInit, OnDestroy {
         this.cachedClasses = undefined;
         this.style = parsed.style;
         this.transformedGraph = this.transform(this.originalGraph);
+        this.updateCustomData();
         this.init();
     }
 
