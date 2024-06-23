@@ -23,6 +23,7 @@ import * as context_menus from 'cytoscape-context-menus';
 import * as expand_collapse from 'cytoscape-expand-collapse';
 import * as fcose from 'cytoscape-fcose';
 import Immutable from 'immutable';
+import * as JSON5 from 'json5';
 import {unionFind, UnionFind} from './union-find';
 import {parseClasses} from './util';
 import {CreateEdgeDialogComponent, CreateEdgeDialogInput, CreateEdgeDialogOutput} from './create-edge-dialog/create-edge-dialog.component';
@@ -309,7 +310,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
     constructor(private dialog: MatDialog) {
         this.transformedGraph = this.transform(this.originalGraph);
-        const dataSource = new URL(location.toString()).searchParams.get('graphUrl') || 'assets/example.json';
+        const dataSource = new URL(location.toString()).searchParams.get('graphUrl') || 'assets/example.json5';
         this.reloadFromUrl(dataSource);
     }
 
@@ -345,7 +346,7 @@ export class AppComponent implements OnInit, OnDestroy {
     reload(data: string) {
         let parsed: SavedData;
         try {
-            parsed = validateSavedData(JSON.parse(data));
+            parsed = validateSavedData(JSON5.parse(data));
         } catch(e: unknown) {
             let msg: string;
             if (e) {
@@ -627,7 +628,7 @@ export class AppComponent implements OnInit, OnDestroy {
             transformations: this.transformations.map(t => ({name: t.name, query: t.query})),
         }, null, 2) + '\n';
         try {
-            validateSavedData(JSON.parse(this.customData));
+            validateSavedData(JSON5.parse(this.customData));
         } catch(e: unknown) {
             let msg: string;
             if (e) {
