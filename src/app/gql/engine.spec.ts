@@ -318,7 +318,7 @@ describe('execute', () => {
         ]);
     });
 
-    it('can filter by path existance', () => {
+    it('can filter by path existence', () => {
         const graph = newGraph()
             .createNode('n1')
             .createNode('n2')

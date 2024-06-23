@@ -347,7 +347,7 @@ function reversePath(path: Path): Path {
     };
 }
 
-function matchPathExistance(expression: Expression): Stage {
+function matchPathExistence(expression: Expression): Stage {
     let path: Path;
     let inverted: boolean;
     if (expression.kind === 'path') {
@@ -368,7 +368,7 @@ function matchPathExistance(expression: Expression): Stage {
     const initializer = new MoveHeadToVariable(path.nodes[0].name);
     const steps = matchSteps(path, false);
     return {
-        stageName: () => 'match_path_existance',
+        stageName: () => 'match_path_existence',
         stageChildren(): QueryPlanStage[] {
             return [initializer, ...steps];
         },
@@ -630,7 +630,7 @@ function planReadPath(path: Path): Stage {
 function planRead(read: ReadClause): Stage[] {
     const stages = read.paths.map(planReadPath);
     if (read.where) {
-        stages.push(matchPathExistance(read.where));
+        stages.push(matchPathExistence(read.where));
     }
     return stages;
 }
