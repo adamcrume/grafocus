@@ -72,9 +72,10 @@ describe('describeQueryPlan', () => {
     it('can describe query', () => {
         const plan = planQuery(parseQuery('match (x) delete x'));
         expect(describeQueryPlan(plan)).toEqual(
-`read_path
-  scan_graph
-  match_node: name=x
+`read
+  read_path
+    scan_graph
+    match_node: name=x
 delete: x
 `);
     });
@@ -82,14 +83,35 @@ delete: x
     it('can describe long paths', () => {
         const plan = planQuery(parseQuery('match (n1)-[e1]-()-[e2:Foo {bar:1}]->(n3:Bar {baz:1}) return n1, n3'));
         expect(describeQueryPlan(plan)).toEqual(
-`read_path
-  scan_graph
-  match_node: name=n1
-  match_edge: name=e1
-  match_node
-  match_edge: name=e2, direction=RIGHT, label=Foo, properties={bar: 1}
-  match_node: name=n3, label=Bar, properties={baz: 1}
+`read
+  read_path
+    scan_graph
+    match_node: name=n1
+    match_edge: name=e1
+    match_node
+    match_edge: name=e2, direction=RIGHT, label=Foo, properties={bar: 1}
+    match_node: name=n3, label=Bar, properties={baz: 1}
 return: n1, n3
+`);
+    });
+
+    it('can describe joins', () => {
+        const plan = planQuery(parseQuery('match (x) where ()-->(x)-->() return x'));
+        expect(describeQueryPlan(plan)).toEqual(
+`read
+  read_path
+    scan_graph
+    match_node: name=x
+  match_path_existence
+    read_path
+      scan_graph
+      match_node
+      match_edge: direction=RIGHT
+      match_node: name=x
+      match_edge: direction=RIGHT
+      match_node
+    join
+return: x
 `);
     });
 });
@@ -360,6 +382,36 @@ describe('execute', () => {
         expect(executeQuery(query, graph).data).toEqual([
             ['n2'],
             ['n3'],
+        ]);
+    });
+
+    it('can filter by path existence without variables at either end', () => {
+        const graph = newGraph()
+            .createNode('n1')
+            .createNode('n2')
+            .createNode('n3')
+            .createEdge('e1', 'n1', 'n2')
+            .createEdge('e2', 'n2', 'n3');
+        const query = 'match (x) where ()-->(x)-->() return x';
+        expect(executeQuery(query, graph).data).toEqual([
+            ['n2'],
+        ]);
+    });
+
+    it('can filter by path existence without variables at either end with existing variables', () => {
+        const graph = newGraph()
+            .createNode('n1')
+            .createNode('n2')
+            .createNode('n3', ['Foo'])
+            .createNode('n4')
+            .createNode('n5')
+            .createEdge('e1', 'n1', 'n2')
+            .createEdge('e2', 'n2', 'n3')
+            .createEdge('e3', 'n3', 'n4')
+            .createEdge('e4', 'n4', 'n5');
+        const query = 'match (y:Foo) match (x) where ()-->(x)-->(y)-->() return x';
+        expect(executeQuery(query, graph).data).toEqual([
+            ['n2'],
         ]);
     });
 

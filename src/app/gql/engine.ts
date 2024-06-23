@@ -18,7 +18,7 @@ import Immutable from 'immutable';
 import {formatExpression, formatLabelExpression, formatMapLiteral, formatPath, formatRemoveItem, formatSetItem, quoteIdentifier} from './formatter';
 import {Edge, Graph, GraphMutation, Node} from './graph';
 import {Create, Direction, Edge as ASTEdge, Expression, Delete, LabelExpression, Node as ASTNode, Path, Query as ASTQuery, ReadClause, RemoveClause, ReturnClause, SetClause, UpdateClause} from './parser';
-import {booleanValue, checkCastNodeRef, EdgeRef, edgeRefValue, listValue, NodeRef, nodeRefValue, numberValue, stringValue, tryCastBoolean, tryCastEdgeRef, tryCastNodeRef, Value} from './values';
+import {booleanValue, checkCastNodeRef, EdgeRef, edgeRefValue, listValue, NodeRef, nodeRefValue, numberValue, serializeValue, stringValue, tryCastBoolean, tryCastEdgeRef, tryCastNodeRef, Value} from './values';
 
 export interface ExecuteQueryResult {
     graph: Graph<Value>,
@@ -121,9 +121,68 @@ class Scope<K, V> {
         this.vars.set(key, value);
     }
 
+    // TODO: optimize
+    keys(): Set<K> {
+        const keys = new Set(this.vars.keys());
+        if (this.parent) {
+            for (const k of this.parent.keys()) {
+                keys.add(k);
+            }
+        }
+        return keys;
+    }
+
     clone(): Scope<K, V> {
         return new Scope(this.parent, new Map(this.vars));
     }
+
+    toMap(): Map<K, V> {
+        if (!this.parent) {
+            return new Map(this.vars);
+        }
+        const map = this.parent.toMap();
+        for (const [k, v] of this.vars) {
+            map.set(k, v);
+        }
+        return map;
+    }
+}
+
+// For every A in left and B in right such that their common keys map to the
+// same values, output A+B.
+function joinMatches(left: Match[], right: Match[]): Match[] {
+    if (left.length === 0 || right.length === 0) {
+        return [];
+    }
+    const m1 = left[0];
+    const m2 = right[0];
+    const commonKeys = [...intersection(m1.keys(), m2.keys())];
+    commonKeys.sort();
+    const joinKey = (match: Match) => JSON.stringify(commonKeys.map(k => serializeValue(match.get(k)!)));
+    const leftByKey = new Map<string, Match[]>();
+    for (const m of left) {
+        const k = joinKey(m);
+        let bucket = leftByKey.get(k);
+        if (!bucket) {
+            bucket = [];
+            leftByKey.set(k, bucket);
+        }
+        bucket.push(m);
+    }
+    const result: Match[] = [];
+    for (const m of right) {
+        const k = joinKey(m);
+        let bucket = leftByKey.get(k);
+        for (const leftMatch of bucket ?? []) {
+            const leftMap = leftMatch.toMap();
+            const rightMap = m.toMap();
+            for (const [kk, vv] of rightMap) {
+                leftMap.set(kk, vv);
+            }
+            result.push(new Scope(undefined, leftMap));
+        }
+    }
+    return result;
 }
 
 interface State {
@@ -136,6 +195,14 @@ interface State {
 
 interface Stage extends QueryPlanStage {
     execute(state: State): void;
+}
+
+interface Stagelet extends QueryPlanStage {
+    execute(matches: Match[], graph: Graph<Value>): Match[];
+}
+
+interface WhereStagelet extends QueryPlanStage {
+    execute(previousMatches: Match[], matches: Match[], graph: Graph<Value>): Match[];
 }
 
 function labelsMatch(labels: Immutable.Set<string>, pattern: LabelExpression): boolean {
@@ -347,7 +414,18 @@ function reversePath(path: Path): Path {
     };
 }
 
-function matchPathExistence(expression: Expression): Stage {
+// Can be replaced by Set.intersection once that's available.
+function intersection<T>(left: Set<T>, right: Set<T>): Set<T> {
+    const result = new Set<T>();
+    for (const k of left) {
+        if (right.has(k)) {
+            result.add(k);
+        }
+    }
+    return result;
+}
+
+function matchPathExistence(expression: Expression): WhereStagelet {
     let path: Path;
     let inverted: boolean;
     if (expression.kind === 'path') {
@@ -362,24 +440,39 @@ function matchPathExistence(expression: Expression): Stage {
     if (!path.nodes[0].name && path.nodes[path.nodes.length - 1].name) {
         path = reversePath(path);
     }
-    if (!path.nodes[0].name) {
-        throw new Error(`WHERE clauses currently require the first node or last to be an existing variable`);
+    if (path.nodes[0].name) {
+        const initializer = new MoveHeadToVariable(path.nodes[0].name);
+        const steps = matchSteps(path, false);
+        return {
+            stageName: () => 'match_path_existence',
+            stageChildren(): QueryPlanStage[] {
+                return [initializer, ...steps];
+            },
+            stageData: () => null,
+            execute(previousMatches: Match[], matches: Match[], graph: Graph<Value>): Match[] {
+                return matches.filter(match => {
+                    const matches = expandMatch(initializer, steps, match, graph);
+                    const foundMatch = !matches.next().done;
+                    return foundMatch !== inverted;
+                });
+            }
+        };
     }
-    const initializer = new MoveHeadToVariable(path.nodes[0].name);
-    const steps = matchSteps(path, false);
+    const stagelet = planReadPath(path);
     return {
         stageName: () => 'match_path_existence',
         stageChildren(): QueryPlanStage[] {
-            return [initializer, ...steps];
+            return [stagelet, {
+                stageName: () => 'join',
+                stageChildren: () => [],
+                stageData: () => null,
+            }];
         },
         stageData: () => null,
-        execute(state: State): void {
-            state.matches = state.matches.filter(match => {
-                const matches = expandMatch(initializer, steps, match, state.graph);
-                const foundMatch = !matches.next().done;
-                return foundMatch !== inverted;
-            });
-        }
+        execute(previousMatches: Match[], matches: Match[], graph: Graph<Value>): Match[] {
+            const newMatches = stagelet.execute(previousMatches, graph);
+            return joinMatches(newMatches, matches);
+        },
     };
 }
 
@@ -608,8 +701,9 @@ function* expandMatch(initializer: MatchInitializer, steps: MatchStep[], match: 
     }
 }
 
-function planReadPath(path: Path): Stage {
+function planReadPath(path: Path): Stagelet {
     const steps = matchSteps(path, true);
+    // TODO: Avoid scanning if the ID of the first node is known
     const initializer: MatchInitializer = new ScanGraph();
     return {
         stageName: () => 'read_path',
@@ -617,22 +711,40 @@ function planReadPath(path: Path): Stage {
             return [initializer, ...steps];
         },
         stageData: () => null,
-        execute(state: State): void {
+        execute(stateMatches: Match[], graph: Graph<Value>): Match[] {
             const matches: Match[] = [];
-            for (const match of state.matches) {
-                matches.push(...expandMatch(initializer, steps, match, state.graph));
+            for (const match of stateMatches) {
+                matches.push(...expandMatch(initializer, steps, match, graph));
             }
-            state.matches = matches;
+            return matches;
         }
     };
 }
 
-function planRead(read: ReadClause): Stage[] {
+function planRead(read: ReadClause): Stage {
     const stages = read.paths.map(planReadPath);
+    let where: WhereStagelet|undefined = undefined;
     if (read.where) {
-        stages.push(matchPathExistence(read.where));
+        where = matchPathExistence(read.where);
     }
-    return stages;
+    return {
+        stageName: () => 'read',
+        stageChildren(): QueryPlanStage[] {
+            let children: QueryPlanStage[] = stages;
+            return children.concat(where ? [where] : []);
+        },
+        stageData: () => null,
+        execute(state: State): void {
+            let matches = state.matches;
+            for (const stage of stages) {
+                matches = stage.execute(matches, state.graph);
+            }
+            if (where) {
+                matches = where.execute(state.matches, matches, state.graph);
+            }
+            state.matches = matches;
+        }
+    };
 }
 
 function planCreate(create: Create): Stage {
@@ -967,7 +1079,7 @@ function planReturn(returnClause: ReturnClause): Stage {
 export function planQuery(query: ASTQuery): QueryPlan {
     const stages: Array<Stage> = [];
     for (const read of query.reads) {
-        stages.push(...planRead(read));
+        stages.push(planRead(read));
     }
     for (const update of query.updates) {
         stages.push(planUpdate(update));
