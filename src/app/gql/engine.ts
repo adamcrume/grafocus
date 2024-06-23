@@ -357,6 +357,38 @@ class MoveHeadToVariable extends MatchInitializer {
     }
 }
 
+class MoveHeadToID extends MatchInitializer {
+    constructor(readonly id: string) {
+        super();
+    }
+
+    override stageName(): string {
+        return 'move_head_to_id';
+    }
+
+    override stageChildren(): QueryPlanStage[] {
+        return [];
+    }
+
+    override stageData(): string {
+        return quoteIdentifier(this.id);
+    }
+
+    override initial(match: Match, graph: Graph<Value>): PathMatch[] {
+        const node = graph.getNodeByID(this.id);
+        if (node === undefined) {
+            throw new Error(`Node ${this.id} not found`);
+        }
+        return [{
+            match,
+            head: node,
+            // This won't work once we use this class within the same graph pattern, i.e. multiple
+            // paths within the same MATCH.
+            traversedEdges: new Set(),
+        }];
+    }
+}
+
 class ScanGraphStep extends MatchStep {
     constructor() {
         super();
@@ -701,10 +733,31 @@ function* expandMatch(initializer: MatchInitializer, steps: MatchStep[], match: 
     }
 }
 
+function fixedID(node: ASTNode): string|undefined {
+    const idExpression = node.properties
+        ?.filter(([k, v]) => k === '_ID')
+        ?.map(([k, v]) => v)
+        ?.[0];
+    let id: string|undefined = undefined;
+    if (idExpression?.kind === 'string') {
+        return idExpression.value;
+    }
+    return undefined;
+}
+
 function planReadPath(path: Path): Stagelet {
+    const firstID = fixedID(path.nodes[0]);
+    const lastID = fixedID(path.nodes[path.nodes.length - 1]);
+    let initializer: MatchInitializer;
+    if (firstID) {
+        initializer = new MoveHeadToID(firstID);
+    } else if (lastID) {
+        path = reversePath(path);
+        initializer = new MoveHeadToID(lastID);
+    } else {
+        initializer = new ScanGraph();
+    }
     const steps = matchSteps(path, true);
-    // TODO: Avoid scanning if the ID of the first node is known
-    const initializer: MatchInitializer = new ScanGraph();
     return {
         stageName: () => 'read_path',
         stageChildren(): QueryPlanStage[] {

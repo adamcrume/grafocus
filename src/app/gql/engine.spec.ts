@@ -114,6 +114,46 @@ return: n1, n3
 return: x
 `);
     });
+
+    it('can describe joins with path starting at ID', () => {
+        const plan = planQuery(parseQuery('match (x) where ({_ID:"y"})-->(x)-->(:Foo) return x'));
+        expect(describeQueryPlan(plan)).toEqual(
+`read
+  read_path
+    scan_graph
+    match_node: name=x
+  match_path_existence
+    read_path
+      move_head_to_id: y
+      match_node: properties={_ID: "y"}
+      match_edge: direction=RIGHT
+      match_node: name=x
+      match_edge: direction=RIGHT
+      match_node: label=Foo
+    join
+return: x
+`);
+    });
+
+    it('can describe joins with path ending at ID', () => {
+        const plan = planQuery(parseQuery('match (x) where (:Foo)-->(x)-->({_ID:"y"}) return x'));
+        expect(describeQueryPlan(plan)).toEqual(
+`read
+  read_path
+    scan_graph
+    match_node: name=x
+  match_path_existence
+    read_path
+      move_head_to_id: y
+      match_node: properties={_ID: "y"}
+      match_edge: direction=LEFT
+      match_node: name=x
+      match_edge: direction=LEFT
+      match_node: label=Foo
+    join
+return: x
+`);
+    });
 });
 
 describe('execute', () => {
@@ -412,6 +452,36 @@ describe('execute', () => {
         const query = 'match (y:Foo) match (x) where ()-->(x)-->(y)-->() return x';
         expect(executeQuery(query, graph).data).toEqual([
             ['n2'],
+        ]);
+    });
+
+    it('can filter by path existence with variable in middle and ID at start', () => {
+        const graph = newGraph()
+            .createNode('n1')
+            .createNode('n2')
+            .createNode('n3')
+            .createNode('n4')
+            .createEdge('e1', 'n1', 'n2')
+            .createEdge('e2', 'n1', 'n3')
+            .createEdge('e3', 'n3', 'n4');
+        const query = 'match (x) where ({_ID:"n1"})-->(x)-->() return x';
+        expect(executeQuery(query, graph).data).toEqual([
+            ['n3'],
+        ]);
+    });
+
+    it('can filter by path existence with variable in middle and ID at end', () => {
+        const graph = newGraph()
+            .createNode('n1')
+            .createNode('n2')
+            .createNode('n3')
+            .createNode('n4')
+            .createEdge('e1', 'n2', 'n4')
+            .createEdge('e2', 'n1', 'n3')
+            .createEdge('e3', 'n3', 'n4');
+        const query = 'match (x) where ()-->(x)-->({_ID:"n4"}) return x';
+        expect(executeQuery(query, graph).data).toEqual([
+            ['n3'],
         ]);
     });
 
