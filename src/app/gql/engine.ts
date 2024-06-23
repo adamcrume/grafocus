@@ -15,8 +15,9 @@
  */
 
 import Immutable from 'immutable';
+import {formatExpression, formatLabelExpression, formatMapLiteral, formatPath, formatSetItem, quoteIdentifier} from './formatter';
 import {Edge, Graph, Node} from './graph';
-import {Create, Edge as ASTEdge, Expression, Delete, formatExpression, formatLabelExpression, formatMapLiteral, formatPath, formatSetItem, LabelExpression, Node as ASTNode, Path, Query as ASTQuery, quoteIdentifier, ReadClause, ReturnClause, SetClause, UpdateClause} from './parser';
+import {Create, Edge as ASTEdge, Expression, Delete, LabelExpression, Node as ASTNode, Path, Query as ASTQuery, ReadClause, ReturnClause, SetClause, UpdateClause} from './parser';
 import {booleanValue, checkCastNodeRef, EdgeRef, edgeRefValue, listValue, NodeRef, nodeRefValue, numberValue, stringValue, tryCastBoolean, tryCastEdgeRef, tryCastNodeRef, Value} from './values';
 
 export interface ExecuteQueryResult {

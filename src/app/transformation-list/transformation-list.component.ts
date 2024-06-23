@@ -20,7 +20,8 @@ import {AbstractControl, NG_VALIDATORS, Validator, ValidationErrors} from '@angu
 import {MatIconModule} from '@angular/material/icon';
 
 import {planQuery, QueryPlan} from '../gql/engine';
-import {quoteIdentifier, parseQuery} from '../gql/parser';
+import {quoteIdentifier} from '../gql/formatter';
+import {parseQuery} from '../gql/parser';
 import {createTransformation, Transformation} from '../transformation';
 
 @Directive({

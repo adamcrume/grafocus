@@ -30,7 +30,7 @@ import {CreateNodeDialogComponent, CreateNodeDialogInput, CreateNodeDialogOutput
 import {HelpDialogComponent} from './help-dialog/help-dialog.component';
 import {MessageDialogComponent, MessageDialogInput} from './message-dialog/message-dialog.component';
 import {ElementDefinition, SavedData, Stylesheet, validateSavedData} from './models';
-import {quoteIdentifier} from './gql/parser';
+import {quoteIdentifier} from './gql/formatter';
 import {Graph, Node, Edge, SerializedGraph} from './gql/graph';
 import {ListType, NUMBER} from './gql/types';
 import {checkCastString, deserializeValue, isList, isNumber, numberList, primitiveValue, serializeValue, stringValue, tryCastNumber, valueType, Value} from './gql/values';
