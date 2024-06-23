@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -28,9 +29,18 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { AppComponent } from './app.component';
+import { AppComponentHarness } from './app.component.harness';
+import { CytoscapeHarness } from './cytoscape.harness';
+
+let originalRequestAnimationFrame: (callback: FrameRequestCallback) => number;
 
 describe('AppComponent', () => {
-  beforeEach(async () => {
+    beforeEach(async () => {
+        originalRequestAnimationFrame = window.requestAnimationFrame;
+        window.requestAnimationFrame = (callback) => {
+            return 0;
+        };
+
     await TestBed.configureTestingModule({
       declarations: [
         AppComponent
@@ -50,7 +60,11 @@ describe('AppComponent', () => {
         NoopAnimationsModule,
       ],
     }).compileComponents();
-  });
+    });
+
+    afterEach(() => {
+        window.requestAnimationFrame = originalRequestAnimationFrame;
+    });
 
     // Note that cytoscape doesn't work inside fakeAsync.
   it('should create the app', async () => {
@@ -67,5 +81,23 @@ describe('AppComponent', () => {
         expect(() => {
             app.collapse('#website_network');
         }).not.toThrow();
+    });
+
+    it('menu respects edit mode', async () => {
+        const fixture = TestBed.createComponent(AppComponent);
+        const harness =
+            await TestbedHarnessEnvironment.harnessForFixture(fixture, AppComponentHarness);
+        const cy = new CytoscapeHarness(fixture.componentInstance);
+        const menu = await harness.getMenu();
+
+        cy.getNode('client_1').rightClick();
+        expect(await menu.isVisible()).toBeTrue();
+        expect(await menu.isItemVisible('add-edge')).toBeFalse();
+        await harness.toggleSideNav();
+        await harness.toggleGraphDefinition();
+        await harness.setEditMode(true);
+        cy.getNode('client_1').rightClick();
+        expect(await menu.isVisible()).toBeTrue();
+        expect(await menu.isItemVisible('add-edge')).toBeTrue();
     });
 });

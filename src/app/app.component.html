@@ -16,6 +16,7 @@
 
 <mat-toolbar color="primary">
   <button
+    class="sidenav-toggle"
     mat-icon-button
     aria-label="Menu"
     matTooltip="Menu"
@@ -157,13 +158,13 @@
             (classesAdded)="onClassesAdded($event)"
             (classesRemoved)="onClassesRemoved($event)"/>
         </mat-expansion-panel>
-        <mat-expansion-panel>
+        <mat-expansion-panel class="graph-definition">
           <mat-expansion-panel-header>
             <mat-panel-title>
               Graph definition
             </mat-panel-title>
           </mat-expansion-panel-header>
-          <mat-slide-toggle [(ngModel)]="editMode">
+          <mat-slide-toggle class="edit-mode" [(ngModel)]="editMode">
             Edit mode
           </mat-slide-toggle>
           <mat-form-field class="graph-def-field">

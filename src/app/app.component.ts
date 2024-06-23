@@ -43,6 +43,13 @@ const PLACE_RIGHT_OF_LABEL = '_PLACE_RIGHT_OF';
 const PLACE_BELOW_LABEL = '_PLACE_BELOW';
 const GAP_PROPERTY = 'gap';
 
+const EDIT_MENUS = [
+    'create-node',
+    'add-edge',
+    'set-parent',
+    'remove',
+];
+
 function svgUrl(svgContent: string) {
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(svgContent);
 }
@@ -241,6 +248,18 @@ class MenuUpdater {
     }
 }
 
+function updateMenuVisibility(menus: contextMenus.ContextMenu, editMode: boolean): void {
+    if (editMode) {
+        for (let menu of EDIT_MENUS) {
+            menus.showMenuItem(menu);
+        }
+    } else {
+        for (let menu of EDIT_MENUS) {
+            menus.hideMenuItem(menu);
+        }
+    }
+}
+
 @Directive({
     selector: '[gqlQuery]',
     providers: [{
@@ -278,6 +297,9 @@ export class AppComponent implements OnInit, OnDestroy {
     private cachedClasses: string[]|undefined = undefined;
     private expandCollapseApi: expand_collapse.Api|undefined = undefined;
     private cy: cytoscape.Core|undefined;
+    get cyForTest(): cytoscape.Core|undefined {
+        return this.cy;
+    }
     private data: {
         title?: string,
         description?: string,
@@ -311,21 +333,8 @@ export class AppComponent implements OnInit, OnDestroy {
     }
     set editMode(value: boolean) {
         this._editMode = value;
-        const editMenus = [
-            'create-node',
-            'add-edge',
-            'set-parent',
-            'remove',
-        ];
-        const menus = this.menus;
-        if (menus && value) {
-            for (let menu of editMenus) {
-                menus.showMenuItem(menu);
-            }
-        } else if (menus && !value) {
-            for (let menu of editMenus) {
-                menus.hideMenuItem(menu);
-            }
+        if (this.menus) {
+            updateMenuVisibility(this.menus, value);
         }
     }
 
@@ -341,7 +350,6 @@ export class AppComponent implements OnInit, OnDestroy {
         cytoscape.use(fcose);
         this.init();
         this.updateCustomData();
-        this.editMode = false; // has side effects
     }
 
     ngOnDestroy() {
@@ -614,6 +622,7 @@ export class AppComponent implements OnInit, OnDestroy {
                 this.addTransformation(`hide simple nodes except class ${cls}`, `MATCH (n:!${quoteIdentifier(cls)}) WHERE NOT (n)<-[:_PARENT]-() DELETE n`)),
         ];
         this.menus = menus;
+        updateMenuVisibility(menus, this.editMode);
         cy.on('cxttap', '*', event => {
             for (let updater of updaters) {
                 updater.updateMenus(event);
