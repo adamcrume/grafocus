@@ -411,4 +411,54 @@ describe('execute', () => {
         }
         expect([...e1.labels]).toEqual(['foo', 'label']);
     });
+
+    it('can remove node properties', () => {
+        const {graph} = executeQuery('match (x) remove x.label',
+                                     newGraph()
+                                         .createNode('x', [], [['foo', stringValue('bar')], ['label', stringValue('x')]]));
+        const x = graph.getNodeByID('x');
+        if (!x) {
+            throw new Error(`x not found`);
+        }
+        expect(checkCastString(x.properties.get('foo'))).toEqual('bar');
+        expect(checkCastString(x.properties.get('label'))).toEqual(undefined);
+    });
+
+    it('can remove edge properties', () => {
+        const {graph} = executeQuery('match (n1)-[e1]-(n2) remove e1.label',
+                                     newGraph()
+                                         .createNode('n1')
+                                         .createNode('n2')
+                                         .createEdge('e1', 'n1', 'n2', [], [['foo', stringValue('bar')], ['label', stringValue('x')]]));
+        const e1 = graph.getEdgeByID('e1');
+        if (!e1) {
+            throw new Error(`e1 not found`);
+        }
+        expect(checkCastString(e1.properties.get('foo'))).toEqual('bar');
+        expect(checkCastString(e1.properties.get('label'))).toEqual(undefined);
+    });
+
+    it('can remove node labels', () => {
+        const {graph} = executeQuery('match (x) remove x:label',
+                                     newGraph()
+                                         .createNode('x', ['foo', 'label']));
+        const x = graph.getNodeByID('x');
+        if (!x) {
+            throw new Error(`x not found`);
+        }
+        expect([...x.labels]).toEqual(['foo']);
+    });
+
+    it('can remove edge labels', () => {
+        const {graph} = executeQuery('match (n1)-[e1]-(n2) remove e1:label',
+                                     newGraph()
+                                         .createNode('n1')
+                                         .createNode('n2')
+                                         .createEdge('e1', 'n1', 'n2', ['foo', 'label']));
+        const e1 = graph.getEdgeByID('e1');
+        if (!e1) {
+            throw new Error(`e1 not found`);
+        }
+        expect([...e1.labels]).toEqual(['foo']);
+    });
 });

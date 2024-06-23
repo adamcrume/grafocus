@@ -15,9 +15,9 @@
  */
 
 import Immutable from 'immutable';
-import {formatExpression, formatLabelExpression, formatMapLiteral, formatPath, formatSetItem, quoteIdentifier} from './formatter';
+import {formatExpression, formatLabelExpression, formatMapLiteral, formatPath, formatRemoveItem, formatSetItem, quoteIdentifier} from './formatter';
 import {Edge, Graph, GraphMutation, Node} from './graph';
-import {Create, Edge as ASTEdge, Expression, Delete, LabelExpression, Node as ASTNode, Path, Query as ASTQuery, ReadClause, ReturnClause, SetClause, UpdateClause} from './parser';
+import {Create, Edge as ASTEdge, Expression, Delete, LabelExpression, Node as ASTNode, Path, Query as ASTQuery, ReadClause, RemoveClause, ReturnClause, SetClause, UpdateClause} from './parser';
 import {booleanValue, checkCastNodeRef, EdgeRef, edgeRefValue, listValue, NodeRef, nodeRefValue, numberValue, stringValue, tryCastBoolean, tryCastEdgeRef, tryCastNodeRef, Value} from './values';
 
 export interface ExecuteQueryResult {
@@ -785,13 +785,84 @@ function planSet(set_: SetClause): Stage {
     };
 }
 
+function planRemove(remove_: RemoveClause): Stage {
+    const items = remove_.items.map(item => {
+        if (item.kind === 'removeProperty') {
+            if (item.property.chain.length !== 1) {
+                throw new Error(`REMOVE only supports VARIABLE.PROPERTY, with no nesting`);
+            }
+            const variable = item.property.root;
+            const property = item.property.chain[0];
+            return (match: Match, graph: Graph<Value>, m: GraphMutation<Value>) => {
+                const value = match.get(variable);
+                if (!value) {
+                    throw new Error(`variable ${JSON.stringify(variable)} not defined`);
+                }
+                const nodeRef = tryCastNodeRef(value);
+                if (nodeRef !== undefined) {
+                    m.updateNodeProperties(nodeRef, p => p.remove(property));
+                    return;
+                }
+                const edgeRef = tryCastEdgeRef(value);
+                if (edgeRef !== undefined) {
+                    m.updateEdgeProperties(edgeRef, p => p.remove(property));
+                    return;
+                }
+                throw new Error(`variable ${JSON.stringify(variable)} is not a node or edge`);
+            };
+        } else {
+            const variable = item.variable;
+            const labels = item.labels;
+            return (match: Match, graph: Graph<Value>, m: GraphMutation<Value>) => {
+                const value = match.get(variable);
+                if (!value) {
+                    throw new Error(`variable ${JSON.stringify(variable)} not defined`);
+                }
+                const nodeRef = tryCastNodeRef(value);
+                if (nodeRef !== undefined) {
+                    m.updateNodeLabels(nodeRef, s => s.subtract(labels));
+                    return;
+                }
+                const edgeRef = tryCastEdgeRef(value);
+                if (edgeRef !== undefined) {
+                    m.updateEdgeLabels(edgeRef, s => s.subtract(labels));
+                    return;
+                }
+                throw new Error(`variable ${JSON.stringify(variable)} is not a node or edge`);
+            };
+        }
+    });
+    return {
+        stageName: () => 'remove',
+        stageChildren(): QueryPlanStage[] {
+            return remove_.items.map(item => ({
+                stageName: () => 'remove_item',
+                stageChildren: () => [],
+                stageData: () => formatRemoveItem(item),
+            }));
+        },
+        stageData: () => null,
+        execute(state: State): void {
+            state.graph = state.graph.withMutations(m => {
+                for (const match of state.matches) {
+                    for (const item of items) {
+                        item(match, state.graph, m);
+                    }
+                }
+            });
+        }
+    };
+}
+
 function planUpdate(update: UpdateClause): Stage {
     if (update.kind === 'create') {
         return planCreate(update);
     } else if (update.kind === 'delete') {
         return planDelete(update);
-    } else {
+    } else if (update.kind === 'set') {
         return planSet(update);
+    } else {
+        return planRemove(update);
     }
 }
 

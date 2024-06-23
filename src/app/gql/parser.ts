@@ -30,7 +30,7 @@ export interface Clause {
 
 export type ReadClause = Match;
 
-export type UpdateClause = Delete | Create | SetClause;
+export type UpdateClause = Delete | Create | SetClause | RemoveClause;
 
 export interface Match extends Clause {
     kind: 'match',
@@ -72,6 +72,25 @@ export type SetItem = SetProperty | SetLabels;
 export interface SetClause extends Clause {
     kind: 'set',
     items: SetItem[],
+}
+
+export interface RemoveProperty {
+    kind: 'removeProperty',
+    property: PropertyExpression,
+    expression: Expression,
+}
+
+export interface RemoveLabels {
+    kind: 'removeLabels',
+    variable: string,
+    labels: string[],
+}
+
+export type RemoveItem = RemoveProperty | RemoveLabels;
+
+export interface RemoveClause extends Clause {
+    kind: 'remove',
+    items: RemoveItem[],
 }
 
 export interface ReturnClause {

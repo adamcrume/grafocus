@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {Edge, Expression, LabelExpression, MapLiteral, Node, Path, SetItem} from './parser';
+import {Edge, Expression, LabelExpression, MapLiteral, Node, Path, RemoveItem, SetItem} from './parser';
 
 export function quoteIdentifier(id: string): string {
     if (/^[_a-zA-Z][_a-zA-Z0-9]*$/.test(id)) {
@@ -179,6 +179,19 @@ export function formatSetItem(i: SetItem): string {
         }
         result += '=';
         result += formatExpression(i.expression);
+        return result;
+    } else {
+        return i.variable + ':' + i.labels.join(':');
+    }
+}
+
+export function formatRemoveItem(i: RemoveItem): string {
+    if (i.kind === 'removeProperty') {
+        let result = i.property.root;
+        for (const name of i.property.chain) {
+            result += '.';
+            result += name;
+        }
         return result;
     } else {
         return i.variable + ':' + i.labels.join(':');
