@@ -42,7 +42,7 @@ export class UnionFind<T> {
         }
         return entry;
     }
-    
+
     private find(entry: Entry<T>): Entry<T> {
         const parent = entry.parent;
         if (!parent) {

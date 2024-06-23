@@ -86,7 +86,7 @@ export function cloneValue(value: Value): Value {
         return {
             type: value.type,
             value: value.value.map(v => cloneValue(v)),
-        };        
+        };
     } else {
         return value;
     }

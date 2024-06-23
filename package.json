@@ -4,12 +4,10 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
-    "prebuild": "npm run peggy",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "pretest": "npm run peggy",
     "test": "ng test",
-    "peggy": "peggy --allowed-start-rules start,node,edge,identifier,expression src/app/gql/parser_impl.pegjs"
+    "generate-parser": "peggy --allowed-start-rules start,node,edge,identifier,expression src/app/gql/parser_impl.pegjs"
   },
   "private": true,
   "dependencies": {
