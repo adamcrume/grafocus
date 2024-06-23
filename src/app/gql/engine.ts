@@ -598,6 +598,49 @@ function planCreate(create: Create): Stage {
             throw new Error('Edges must specify a direction in create clauses');
         }
     }
+    interface NodePlan {
+        name: string|null,
+        labels: string[],
+        properties: Array<[string, EvaluatePlan]>,
+    }
+    const pathNodes: Array<NodePlan> = create.path.nodes.map(n => {
+        const labels: string[] = [];
+        if (n.label !== null) {
+            if (n.label.kind !== 'identifier') {
+                throw new Error(`Only plain label identifiers are allowed in CREATE clauses, but found ${JSON.stringify(n.label)}`);
+            }
+            labels.push(n.label.value);
+        }
+        return {
+            name: n.name,
+            labels,
+            properties: (n.properties ?? []).map(([k, v]) => [k, planEvaluate(v)]),
+        };
+    });
+    interface EdgePlan {
+        srcOffset: number,
+        dstOffset: number,
+        labels: string[],
+        properties: Array<[string, EvaluatePlan]>,
+    }
+    const pathEdges: Array<EdgePlan> = create.path.edges.map(e => {
+        const labels: string[] = [];
+        if (e.label !== null) {
+            if (e.label.kind !== 'identifier') {
+                throw new Error(`Only plain label identifiers are allowed in CREATE clauses, but found ${JSON.stringify(e.label)}`);
+            }
+            labels.push(e.label.value);
+        }
+        let properties: Array<[string, EvaluatePlan]> = (e.properties ?? []).map(([k, v]) => {
+            return [k, planEvaluate(v)];
+        });
+        return {
+            srcOffset: e.direction === 'RIGHT' ? 0 : 1,
+            dstOffset: e.direction === 'RIGHT' ? 1 : 0,
+            labels,
+            properties: (e.properties ?? []).map(([k, v]) => [k, planEvaluate(v)]),
+        };
+    });
     return {
         stageName: () => 'create',
         stageChildren: () => [],
@@ -605,7 +648,7 @@ function planCreate(create: Create): Stage {
         execute(state: State): void {
             state.graph = state.graph.withMutations(mutation => {
                 for (const match of state.matches) {
-                    const nodeIDs: string[] = create.path.nodes.map(n => {
+                    const nodeIDs: string[] = pathNodes.map(n => {
                         if (n.name !== null) {
                             const element = match.get(n.name);
                             if (!element) {
@@ -615,42 +658,24 @@ function planCreate(create: Create): Stage {
                             if (nodeRef === undefined) {
                                 throw new Error(`variable ${JSON.stringify(n.name)} is not a node`);
                             }
-                            const node = state.graph.getNodeByID(nodeRef);
-                            if (!node) {
-                                throw new Error(`Node ${JSON.stringify(nodeRef)} not found`);
-                            }
-                            return node.id;
+                            return nodeRef;
                         }
-                        let labels: string[] = [];
-                        if (n.label !== null) {
-                            if (n.label.kind !== 'identifier') {
-                                throw new Error(`Only plain label identifiers are allowed in CREATE clauses, but found ${JSON.stringify(n.label)}`);
-                            }
-                            labels.push(n.label.value);
-                        }
-                        let properties: Array<[string, Value]> = (n.properties ?? []).map(([k, v]) => {
-                            return [k, evaluate(v, match, state.graph)];
+                        let properties: Array<[string, Value]> = n.properties.map(([k, v]) => {
+                            return [k, v(match, state.graph)];
                         });
                         const id = state.createNodeID();
-                        mutation.createNode(id, labels, properties);
+                        mutation.createNode(id, n.labels, properties);
                         return id;
                     });
-                    for (let i = 0; i < create.path.edges.length; i++) {
-                        const e = create.path.edges[i];
-                        const srcID = nodeIDs[e.direction === 'RIGHT' ? i : i + 1];
-                        const dstID = nodeIDs[e.direction === 'RIGHT' ? i + 1: i];
-                        let labels: string[] = [];
-                        if (e.label !== null) {
-                            if (e.label.kind !== 'identifier') {
-                                throw new Error(`Only plain label identifiers are allowed in CREATE clauses, but found ${JSON.stringify(e.label)}`);
-                            }
-                            labels.push(e.label.value);
-                        }
-                        let properties: Array<[string, Value]> = (e.properties ?? []).map(([k, v]) => {
-                            return [k, evaluate(v, match, state.graph)];
+                    for (let i = 0; i < pathEdges.length; i++) {
+                        const e = pathEdges[i];
+                        const srcID = nodeIDs[e.srcOffset + i];
+                        const dstID = nodeIDs[e.dstOffset + i];
+                        let properties: Array<[string, Value]> = e.properties.map(([k, v]) => {
+                            return [k, v(match, state.graph)];
                         });
                         const edgeID = state.createEdgeID();
-                        mutation.createEdge(edgeID, srcID, dstID, labels, properties);
+                        mutation.createEdge(edgeID, srcID, dstID, e.labels, properties);
                     }
                 }
             });
@@ -688,6 +713,16 @@ function planDelete(delete_: Delete): Stage {
 }
 
 function planSet(set_: SetClause): Stage {
+    const items = set_.items.map(item => {
+        if (item.property.chain.length !== 1) {
+            throw new Error(`SET only supports VARIABLE.PROPERTY, with no nesting`);
+        }
+        return {
+            variable: item.property.root,
+            property: item.property.chain[0],
+            expression: planEvaluate(item.expression),
+        };
+    });
     return {
         stageName: () => 'set',
         stageChildren(): QueryPlanStage[] {
@@ -701,32 +736,26 @@ function planSet(set_: SetClause): Stage {
         execute(state: State): void {
             state.graph = state.graph.withMutations(m => {
                 for (const match of state.matches) {
-                    for (const item of set_.items) {
-                        const value = match.get(item.property.root);
+                    for (const item of items) {
+                        const value = match.get(item.variable);
                         if (!value) {
-                            throw new Error(`variable ${JSON.stringify(item.property.root)} not defined`);
+                            throw new Error(`variable ${JSON.stringify(item.variable)} not defined`);
                         }
                         const nodeRef = tryCastNodeRef(value);
                         if (nodeRef !== undefined) {
-                            if (item.property.chain.length !== 1) {
-                                throw new Error(`SET only supports VARIABLE.PROPERTY, with no nesting`);
-                            }
-                            const k = item.property.chain[0];
-                            const v = evaluate(item.expression, match, state.graph);
+                            const k = item.property;
+                            const v = item.expression(match, state.graph);
                             m.updateNodeProperties(nodeRef, p => p.set(k, v));
                             continue;
                         }
                         const edgeRef = tryCastEdgeRef(value);
                         if (edgeRef !== undefined) {
-                            if (item.property.chain.length !== 1) {
-                                throw new Error(`SET only supports VARIABLE.PROPERTY, with no nesting`);
-                            }
-                            const k = item.property.chain[0];
-                            const v = evaluate(item.expression, match, state.graph);
+                            const k = item.property;
+                            const v = item.expression(match, state.graph);
                             m.updateEdgeProperties(edgeRef, p => p.set(k, v));
                             continue;
                         }
-                        throw new Error(`variable ${JSON.stringify(item.property.root)} is not a node or edge`);
+                        throw new Error(`variable ${JSON.stringify(item.variable)} is not a node or edge`);
                     }
                 }
             });
@@ -744,36 +773,48 @@ function planUpdate(update: UpdateClause): Stage {
     }
 }
 
-function evaluate(expression: Expression, variables: Match, graph: Graph<Value>): Value {
+type EvaluatePlan = (variables: Match, graph: Graph<Value>) => Value;
+
+function planEvaluate(expression: Expression): EvaluatePlan {
     if (expression.kind === 'string') {
-        return stringValue(expression.value);
+        const v = stringValue(expression.value);
+        return () => v;
     } else if (expression.kind === 'number') {
-        return numberValue(expression.value);
+        const v = numberValue(expression.value);
+        return () => v;
     } else if (expression.kind === 'identifier') {
-        const v = variables.get(expression.value);
-        if (!v) {
-            throw new Error(`Variable ${JSON.stringify(expression.value)} not found`);
-        }
-        return v;
+        return (variables: Match, graph: Graph<Value>) => {
+            const v = variables.get(expression.value);
+            if (!v) {
+                throw new Error(`Variable ${JSON.stringify(expression.value)} not found`);
+            }
+            return v;
+        };
     } else if (expression.kind === 'not') {
-        // TODO: test
-        const b = tryCastBoolean(evaluate(expression.value, variables, graph));
-        if (b === undefined) {
-            throw new Error(`Expression is not a boolean: ${JSON.stringify(expression.value)}`);
-        }
-        return booleanValue(!b);
+        const inner = planEvaluate(expression.value);
+        return (variables: Match, graph: Graph<Value>) => {
+            // TODO: test
+            const b = tryCastBoolean(inner(variables, graph));
+            if (b === undefined) {
+                throw new Error(`Expression is not a boolean: ${JSON.stringify(expression.value)}`);
+            }
+            return booleanValue(!b);
+        };
     } else if (expression.kind === 'path') {
         // TODO: test
         const steps = matchSteps(expression.value, false);
         // TODO: choose better
         const initializer = new ScanGraph();
-        return booleanValue(expandMatch(initializer, steps, variables, graph, true).length > 0);
+        return (variables: Match, graph: Graph<Value>) => {
+            return booleanValue(expandMatch(initializer, steps, variables, graph, true).length > 0);
+        };
     } else {
         throw new Error(`Unrecognized expression: ${JSON.stringify(expression)}`);
     }
 }
 
 function planReturn(returnClause: ReturnClause): Stage {
+    const expressions = returnClause.values.map(planEvaluate);
     return ({
         stageName: () => 'return',
         stageChildren: () => [],
@@ -781,7 +822,7 @@ function planReturn(returnClause: ReturnClause): Stage {
             return returnClause.values.map(formatExpression);
         },
         execute(state: State): void {
-            state.returnValue = state.matches.map(m => returnClause.values.map(e => evaluate(e, m, state.graph)));
+            state.returnValue = state.matches.map(m => expressions.map(e => e(m, state.graph)));
         }
     });
 }
