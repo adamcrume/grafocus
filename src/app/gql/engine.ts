@@ -16,7 +16,7 @@
 
 import Immutable from 'immutable';
 import {Edge, Graph, Node} from './graph';
-import {Create, Edge as ASTEdge, Expression, Delete, formatExpression, formatLabelExpression, formatMapLiteral, formatPath, LabelExpression, Node as ASTNode, Path, Query as ASTQuery, quoteIdentifier, ReadClause, ReturnClause, UpdateClause} from './parser';
+import {Create, Edge as ASTEdge, Expression, Delete, formatExpression, formatLabelExpression, formatMapLiteral, formatPath, formatSetItem, LabelExpression, Node as ASTNode, Path, Query as ASTQuery, quoteIdentifier, ReadClause, ReturnClause, SetClause, UpdateClause} from './parser';
 import {booleanValue, checkCastNodeRef, EdgeRef, edgeRefValue, listValue, NodeRef, nodeRefValue, numberValue, stringValue, tryCastBoolean, tryCastEdgeRef, tryCastNodeRef, Value} from './values';
 
 export interface ExecuteQueryResult {
@@ -57,9 +57,7 @@ function describeQueryPlanStage(stage: QueryPlanStage, indent: number): string {
     const stageData = stage.stageData();
     if (stageData !== null) {
         let details = '';
-        if (typeof stageData === 'string') {
-            details += stageData;
-        } else if (Array.isArray(stageData)) {
+        if (Array.isArray(stageData)) {
             let first = true;
             for (const element of stageData) {
                 if (Array.isArray(element)) {
@@ -82,6 +80,8 @@ function describeQueryPlanStage(stage: QueryPlanStage, indent: number): string {
                     details += element;
                 }
             }
+        } else {
+            details += stageData;
         }
         if (details.length) {
             result += ': ';
@@ -687,11 +687,60 @@ function planDelete(delete_: Delete): Stage {
     };
 }
 
+function planSet(set_: SetClause): Stage {
+    return {
+        stageName: () => 'set',
+        stageChildren(): QueryPlanStage[] {
+            return set_.items.map(item => ({
+                stageName: () => 'set_item',
+                stageChildren: () => [],
+                stageData: () => formatSetItem(item),
+            }));
+        },
+        stageData: () => null,
+        execute(state: State): void {
+            state.graph = state.graph.withMutations(m => {
+                for (const match of state.matches) {
+                    for (const item of set_.items) {
+                        const value = match.get(item.property.root);
+                        if (!value) {
+                            throw new Error(`variable ${JSON.stringify(item.property.root)} not defined`);
+                        }
+                        const nodeRef = tryCastNodeRef(value);
+                        if (nodeRef !== undefined) {
+                            if (item.property.chain.length !== 1) {
+                                throw new Error(`SET only supports VARIABLE.PROPERTY, with no nesting`);
+                            }
+                            const k = item.property.chain[0];
+                            const v = evaluate(item.expression, match, state.graph);
+                            m.updateNodeProperties(nodeRef, p => p.set(k, v));
+                            continue;
+                        }
+                        const edgeRef = tryCastEdgeRef(value);
+                        if (edgeRef !== undefined) {
+                            if (item.property.chain.length !== 1) {
+                                throw new Error(`SET only supports VARIABLE.PROPERTY, with no nesting`);
+                            }
+                            const k = item.property.chain[0];
+                            const v = evaluate(item.expression, match, state.graph);
+                            m.updateEdgeProperties(edgeRef, p => p.set(k, v));
+                            continue;
+                        }
+                        throw new Error(`variable ${JSON.stringify(item.property.root)} is not a node or edge`);
+                    }
+                }
+            });
+        }
+    };
+}
+
 function planUpdate(update: UpdateClause): Stage {
     if (update.kind === 'create') {
         return planCreate(update);
-    } else {
+    } else if (update.kind === 'delete') {
         return planDelete(update);
+    } else {
+        return planSet(update);
     }
 }
 

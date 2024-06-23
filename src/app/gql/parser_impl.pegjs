@@ -46,7 +46,7 @@ query = reads:readClause|.., sp| sp tail:(
 
 readClause = match
 
-updateClause = create / delete
+updateClause = create / delete / set
 
 // query = clauses:clause |1.., sp| {
 //   return {
@@ -68,6 +68,31 @@ delete = detach:"detach"i? sp "delete"i sp name:identifier {
     kind: 'delete',
     detach: !!detach,
     name,
+  };
+}
+
+propertyExpression = root:identifier chain:(sp "." sp @identifier)+ {
+  return {
+    kind: 'propertyExpression',
+    root,
+    chain,
+  }
+}
+
+setProperty = p:propertyExpression sp "=" sp e:expression {
+  return {
+    kind: 'setProperty',
+    property: p,
+    expression: e,
+  }
+}
+
+setItem = setProperty
+
+set = "set"i sp items:setItem|1.., sp "," sp| {
+  return {
+    kind: 'set',
+    items,
   };
 }
 

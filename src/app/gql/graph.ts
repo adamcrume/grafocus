@@ -94,6 +94,24 @@ export class GraphMutation<Value> {
         return this;
     }
 
+    updateNodeProperties(nodeID: string, update: (properties: Immutable.Map<string, Value>) => Immutable.Map<string, Value>): this {
+        const node = this.nodes.get(nodeID);
+        if (!node) {
+            throw new Error(`Node not found: ${JSON.stringify(nodeID)}`);
+        }
+        this.nodes.set(nodeID, nodeWithProperties(node, update(node.properties)));
+        return this;
+    }
+
+    updateEdgeProperties(edgeID: string, update: (properties: Immutable.Map<string, Value>) => Immutable.Map<string, Value>): this {
+        const edge = this.edges.get(edgeID);
+        if (!edge) {
+            throw new Error(`Edge not found: ${JSON.stringify(edgeID)}`);
+        }
+        this.edges.set(edgeID, edgeWithProperties(edge, update(edge.properties)));
+        return this;
+    }
+
     removeNode(nodeID: string): this {
         const node = this.nodes.get(nodeID);
         if (!node) {

@@ -30,7 +30,7 @@ export interface Clause {
 
 export type ReadClause = Match;
 
-export type UpdateClause = Delete | Create;
+export type UpdateClause = Delete | Create | SetClause;
 
 export interface Match extends Clause {
     kind: 'match',
@@ -44,9 +44,28 @@ export interface Create extends Clause {
 }
 
 export interface Delete extends Clause {
-    kind: 'update',
+    kind: 'delete',
     detach: boolean,
     name: string,
+}
+
+export interface PropertyExpression {
+    kind: 'propertyExpression',
+    root: string,
+    chain: string[],
+}
+
+export interface SetProperty {
+    kind: 'setProperty',
+    property: PropertyExpression,
+    expression: Expression,
+}
+
+type SetItem = SetProperty;
+
+export interface SetClause extends Clause {
+    kind: 'set',
+    items: SetItem[],
 }
 
 export interface ReturnClause {
@@ -294,5 +313,16 @@ export function formatExpression(e: Expression): string {
     } else {
         throw new Error(`Unrecognized expression: ${JSON.stringify(e)}`);
     }
+    return result;
+}
+
+export function formatSetItem(i: SetItem): string {
+    let result = i.property.root;
+    for (const name of i.property.chain) {
+        result += '.';
+        result += name;
+    }
+    result += '=';
+    result += formatExpression(i.expression);
     return result;
 }

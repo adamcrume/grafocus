@@ -17,7 +17,7 @@
 import {describeQueryPlan, planQuery} from './engine';
 import {Edge, Graph, Node} from './graph';
 import {NUMBER} from './types';
-import {checkCastEdgeRef, checkCastList, checkCastNodeRef, numberValue, stringValue, tryCastList, tryCastNodeRef, tryCastEdgeRef, Value} from './values';
+import {checkCastEdgeRef, checkCastList, checkCastNodeRef, checkCastString, numberValue, stringValue, tryCastList, tryCastNodeRef, tryCastEdgeRef, Value} from './values';
 import {parseQuery} from './parser';
 
 function newGraph(): Graph<Value> {
@@ -362,5 +362,29 @@ describe('execute', () => {
         const edges = [...graph.outgoingNeighbors(x)].map(([e, n]) => e);
         expect(edges.length).toEqual(1);
         expect(edges[0].dstID).toBe(bar[0].id);
+    });
+
+    it('can set node properties', () => {
+        const {graph} = executeQuery('match (x) set x.label="test"',
+                                     newGraph()
+                                         .createNode('x'));
+        const x = graph.getNodeByID('x');
+        if (!x) {
+            throw new Error(`x not found`);
+        }
+        expect(checkCastString(x.properties.get('label'))).toEqual('test');
+    });
+
+    it('can set edge properties', () => {
+        const {graph} = executeQuery('match (n1)-[e1]-(n2) set e1.label="test"',
+                                     newGraph()
+                                         .createNode('n1')
+                                         .createNode('n2')
+                                         .createEdge('e1', 'n1', 'n2'));
+        const e1 = graph.getEdgeByID('e1');
+        if (!e1) {
+            throw new Error(`e1 not found`);
+        }
+        expect(checkCastString(e1.properties.get('label'))).toEqual('test');
     });
 });
