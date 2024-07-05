@@ -21,25 +21,24 @@
   Other classes: {{classes.disjoint.join(', ')}}
 </p>
 
-<ng-container *ngIf="editMode">
-<mat-form-field>
-  <mat-label>Classes</mat-label>
-  <input
-    type="text"
-    matInput
-    #classesModel="ngModel"
-    [pattern]="classesPattern"
-    [(ngModel)]="classesInput">
-</mat-form-field>
-
-<div class="buttons">
-  <button
-    mat-raised-button
-    [disabled]="!classesModel.valid"
+@if (editMode) {
+  <mat-form-field>
+    <mat-label>Classes</mat-label>
+    <input
+      type="text"
+      matInput
+      #classesModel="ngModel"
+      [pattern]="classesPattern"
+      [(ngModel)]="classesInput">
+  </mat-form-field>
+  <div class="buttons">
+    <button
+      mat-raised-button
+      [disabled]="!classesModel.valid"
     (click)="removeClasses()">Remove</button>
-  <button
-    mat-raised-button
-    [disabled]="!classesModel.valid"
+    <button
+      mat-raised-button
+      [disabled]="!classesModel.valid"
     (click)="addClasses()">Add</button>
-</div>
-</ng-container>
+  </div>
+}

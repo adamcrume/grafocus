@@ -44,30 +44,37 @@
 <mat-sidenav-container>
   <mat-sidenav #sidenav mode="side" opened="true">
     <div class="sidenav-content">
-      <mat-form-field *ngIf="editMode">
-        <mat-label>Title</mat-label>
-        <input
-          type="text"
-          matInput
-          [ngModel]="title"
-          (ngModelChange)="onGraphTitleChange($event)">
-      </mat-form-field>
-      <h3 *ngIf="!editMode">{{title}}</h3>
+      @if (editMode) {
+        <mat-form-field>
+          <mat-label>Title</mat-label>
+          <input
+            type="text"
+            matInput
+            [ngModel]="title"
+            (ngModelChange)="onGraphTitleChange($event)">
+        </mat-form-field>
+      }
+      @else {
+        <h3>{{title}}</h3>
+      }
 
-      <mat-form-field *ngIf="editMode">
-        <mat-label>Description</mat-label>
-        <textarea
-          matInput
-          [ngModel]="description"
-          (ngModelChange)="onGraphDescriptionChange($event)"
-          rows="4">
-        </textarea>
-      </mat-form-field>
-      <!-- Careful of the whitespace here because we're using pre-wrap. -->
-      <div
-        *ngIf="!editMode"
-        class="description"
+      @if (editMode) {
+        <mat-form-field>
+          <mat-label>Description</mat-label>
+          <textarea
+            matInput
+            [ngModel]="description"
+            (ngModelChange)="onGraphDescriptionChange($event)"
+            rows="4">
+          </textarea>
+        </mat-form-field>
+      }
+      @else {
+        <!-- Careful of the whitespace here because we're using pre-wrap. -->
+        <div
+          class="description"
         >{{description}}</div>
+      }
 
       <div class="row">
         <button
@@ -101,22 +108,24 @@
               Selected element
             </mat-panel-title>
           </mat-expansion-panel-header>
-          <element-properties
-            *ngIf="selected"
-            [element]="selected"
-            [editMode]="editMode"
-            (classesChange)="onClassesChange($event)"
-            (labelChange)="onLabelChange($event)"
-            (descriptionChange)="onDescriptionChange($event)"/>
-          <ng-container *ngIf="!selected && !multipleSelected">
+          @if (selected) {
+            <element-properties
+              [element]="selected"
+              [editMode]="editMode"
+              (classesChange)="onClassesChange($event)"
+              (labelChange)="onLabelChange($event)"
+              (descriptionChange)="onDescriptionChange($event)"/>
+          }
+          @if (!selected && !multipleSelected) {
             Nothing selected.
-          </ng-container>
-          <multi-element-properties
-            *ngIf="!selected && multipleSelected"
-            [selection]="selection"
-            [editMode]="editMode"
-            (classesAdded)="onClassesAdded($event)"
-            (classesRemoved)="onClassesRemoved($event)"/>
+          }
+          @if (!selected && multipleSelected) {
+            <multi-element-properties
+              [selection]="selection"
+              [editMode]="editMode"
+              (classesAdded)="onClassesAdded($event)"
+              (classesRemoved)="onClassesRemoved($event)"/>
+          }
         </mat-expansion-panel>
         <mat-expansion-panel class="graph-definition" expanded="true">
           <mat-expansion-panel-header>

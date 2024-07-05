@@ -14,39 +14,50 @@
  limitations under the License.
 -->
 
-<mat-form-field *ngIf="editMode">
-  <mat-label>ID</mat-label>
-  <input type="text" matInput [ngModel]="id" readonly="true">
-</mat-form-field>
+@if (editMode) {
+  <mat-form-field>
+    <mat-label>ID</mat-label>
+    <input type="text" matInput [ngModel]="id" readonly="true">
+  </mat-form-field>
+}
 
-<mat-form-field *ngIf="editMode">
-  <mat-label>Label</mat-label>
-  <input type="text" matInput [ngModel]="label" (ngModelChange)="labelChange.emit($event)">
-</mat-form-field>
-<h4 *ngIf="!editMode">{{label}}</h4>
+@if (editMode) {
+  <mat-form-field>
+    <mat-label>Label</mat-label>
+    <input type="text" matInput [ngModel]="label" (ngModelChange)="labelChange.emit($event)">
+  </mat-form-field>
+}
+@else {
+  <h4>{{label}}</h4>
+}
 
-<mat-form-field *ngIf="editMode">
-  <mat-label>Classes</mat-label>
-  <input
-    type="text"
-    matInput
-    [pattern]="classesPattern"
-    [(ngModel)]="classes"
-    #classesModel="ngModel"
-    (ngModelChange)="classesModel.valid?onClassesChanged():undefined">
-</mat-form-field>
+@if (editMode) {
+  <mat-form-field>
+    <mat-label>Classes</mat-label>
+    <input
+      type="text"
+      matInput
+      [pattern]="classesPattern"
+      [(ngModel)]="classes"
+      #classesModel="ngModel"
+      (ngModelChange)="classesModel.valid?onClassesChanged():undefined">
+  </mat-form-field>
+}
 
-<mat-form-field *ngIf="editMode">
-  <mat-label>Description</mat-label>
-  <textarea
-    matInput
-    [(ngModel)]="description"
-    (ngModelChange)="descriptionChange.emit(description)"
-    rows="4">
-  </textarea>
-</mat-form-field>
-<!-- Careful of the whitespace here because we're using pre-wrap. -->
-<div
-  *ngIf="!editMode"
-  class="description"
+@if (editMode) {
+  <mat-form-field>
+    <mat-label>Description</mat-label>
+    <textarea
+      matInput
+      [(ngModel)]="description"
+      (ngModelChange)="descriptionChange.emit(description)"
+      rows="4">
+    </textarea>
+  </mat-form-field>
+}
+@else {
+  <!-- Careful of the whitespace here because we're using pre-wrap. -->
+  <div
+    class="description"
   >{{description}}</div>
+}

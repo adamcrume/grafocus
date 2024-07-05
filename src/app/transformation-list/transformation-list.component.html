@@ -18,20 +18,21 @@
   class="mat-mdc-chip-set-stacked"
   cdkDropList
   (cdkDropListDropped)="transformationMoved($event)">
-  <mat-chip-option
-    *ngFor="let transformation of transformations"
-    #toggle
-    matTooltip="{{transformation.query}}"
-    cdkDrag
-    [selected]="transformation.enabled"
-    (click)="toggleTransformation(transformation, toggle.selected)"
-    (removed)="removeTransformation(transformation)">
-    <mat-chip-option disabled *cdkDragPlaceholder></mat-chip-option>
-    {{transformation.name}}
-    <button matChipRemove>
-      <mat-icon>cancel</mat-icon>
-    </button>
-  </mat-chip-option>
+  @for (transformation of transformations; track transformation) {
+    <mat-chip-option
+      #toggle
+      matTooltip="{{transformation.query}}"
+      cdkDrag
+      [selected]="transformation.enabled"
+      (click)="toggleTransformation(transformation, toggle.selected)"
+      (removed)="removeTransformation(transformation)">
+      <mat-chip-option disabled *cdkDragPlaceholder></mat-chip-option>
+      {{transformation.name}}
+      <button matChipRemove>
+        <mat-icon>cancel</mat-icon>
+      </button>
+    </mat-chip-option>
+  }
 </mat-chip-set>
 <form #transformationForm="ngForm">
   <mat-form-field class="query-field">
@@ -44,11 +45,13 @@
       name="transformation"
       rows="4"></textarea>
   </mat-form-field>
-  <mat-error *ngIf="transformationForm?.controls?.['transformation']?.errors">
-    {{
-    transformationForm?.controls?.['transformation']?.errors?.['error']
-    }}
-  </mat-error>
+  @if (transformationForm?.controls?.['transformation']?.errors) {
+    <mat-error>
+      {{
+      transformationForm?.controls?.['transformation']?.errors?.['error']
+      }}
+    </mat-error>
+  }
   <button
     [disabled]="!transformationForm.valid || !newTransformationField.value"
     mat-raised-button
