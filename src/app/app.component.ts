@@ -19,11 +19,11 @@ import {Component, ElementRef, OnDestroy, OnInit, ViewChild} from '@angular/core
 import {MatDialog} from '@angular/material/dialog';
 
 import cytoscape from 'cytoscape';
-import * as context_menus from 'cytoscape-context-menus';
-import * as expand_collapse from 'cytoscape-expand-collapse';
-import * as fcose from 'cytoscape-fcose';
+import context_menus from 'cytoscape-context-menus';
+import expand_collapse from 'cytoscape-expand-collapse';
+import fcose from 'cytoscape-fcose';
 import Immutable from 'immutable';
-import * as JSON5 from 'json5';
+import JSON5 from 'json5';
 import {unionFind, UnionFind} from './union-find';
 import {parseClasses} from './util';
 import {CreateEdgeDialogComponent, CreateEdgeDialogInput, CreateEdgeDialogOutput} from './create-edge-dialog/create-edge-dialog.component';
