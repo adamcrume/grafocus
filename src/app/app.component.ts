@@ -36,6 +36,19 @@ import {Graph, Node, Edge, SerializedGraph} from './gql/graph';
 import {ListType, NUMBER} from './gql/types';
 import {checkCastString, deserializeValue, isList, isNumber, numberList, primitiveValue, serializeValue, stringValue, tryCastNumber, valueType, Value} from './gql/values';
 import {createTransformation, Transformation} from './transformation';
+import { MatSlideToggle } from '@angular/material/slide-toggle';
+import { MultiElementPropertiesComponent } from './multi-element-properties/multi-element-properties.component';
+import { ElementPropertiesComponent } from './element-properties/element-properties.component';
+import { TransformationListComponent } from './transformation-list/transformation-list.component';
+import { MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle } from '@angular/material/expansion';
+import { FormsModule } from '@angular/forms';
+import { MatInput } from '@angular/material/input';
+import { MatFormField, MatLabel } from '@angular/material/form-field';
+import { MatSidenavContainer, MatSidenav, MatSidenavContent } from '@angular/material/sidenav';
+import { MatIcon } from '@angular/material/icon';
+import { MatTooltip } from '@angular/material/tooltip';
+import { MatIconButton, MatButton } from '@angular/material/button';
+import { MatToolbar } from '@angular/material/toolbar';
 
 const PARENT_LABEL = '_PARENT';
 const ALIGN_VERTICAL_LABEL = '_ALIGN_VERTICAL';
@@ -259,6 +272,29 @@ function updateMenuVisibility(menus: contextMenus.ContextMenu, editMode: boolean
     selector: 'app-root',
     templateUrl: './app.component.html',
     styleUrls: ['./app.component.scss'],
+    standalone: true,
+    imports: [
+        MatToolbar,
+        MatIconButton,
+        MatTooltip,
+        MatIcon,
+        MatSidenavContainer,
+        MatSidenav,
+        MatFormField,
+        MatLabel,
+        MatInput,
+        FormsModule,
+        MatButton,
+        MatAccordion,
+        MatExpansionPanel,
+        MatExpansionPanelHeader,
+        MatExpansionPanelTitle,
+        TransformationListComponent,
+        ElementPropertiesComponent,
+        MultiElementPropertiesComponent,
+        MatSlideToggle,
+        MatSidenavContent,
+    ],
 })
 export class AppComponent implements OnInit, OnDestroy {
     @ViewChild('graph', {static: true}) graph!: ElementRef<HTMLElement>;

@@ -16,8 +16,30 @@
 
 import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
 
-import { AppModule } from './app/app.module';
+
+import { importProvidersFrom } from '@angular/core';
+import { AppComponent } from './app/app.component';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatToolbarModule } from '@angular/material/toolbar';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatSelectModule } from '@angular/material/select';
+import { MatInputModule } from '@angular/material/input';
+import { MatIconModule } from '@angular/material/icon';
+import { MatExpansionModule } from '@angular/material/expansion';
+import { MatDialogModule } from '@angular/material/dialog';
+import { MatChipsModule } from '@angular/material/chips';
+import { MatButtonModule } from '@angular/material/button';
+import { FormsModule } from '@angular/forms';
+import { DragDropModule } from '@angular/cdk/drag-drop';
+import { provideAnimations } from '@angular/platform-browser/animations';
+import { BrowserModule, bootstrapApplication } from '@angular/platform-browser';
 
 
-platformBrowserDynamic().bootstrapModule(AppModule)
+bootstrapApplication(AppComponent, {
+    providers: [
+        importProvidersFrom(BrowserModule, DragDropModule, FormsModule, MatButtonModule, MatChipsModule, MatDialogModule, MatExpansionModule, MatIconModule, MatInputModule, MatSelectModule, MatSidenavModule, MatSlideToggleModule, MatToolbarModule, MatTooltipModule),
+        provideAnimations()
+    ]
+})
   .catch(err => console.error(err));

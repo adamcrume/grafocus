@@ -44,7 +44,6 @@ describe('AppComponent', () => {
         };
 
     await TestBed.configureTestingModule({
-    declarations: [AppComponent],
     imports: [
         FormsModule,
         MatButtonModule,
@@ -60,6 +59,7 @@ describe('AppComponent', () => {
         MatTooltipModule,
         NoopAnimationsModule,
         TransformationListComponent,
+        AppComponent,
     ],
 }).compileComponents();
     });
