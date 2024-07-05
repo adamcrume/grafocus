@@ -14,15 +14,20 @@
  * limitations under the License.
  */
 
-import {CdkDragDrop, moveItemInArray} from '@angular/cdk/drag-drop';
+import { CdkDragDrop, moveItemInArray, CdkDropList, CdkDrag, CdkDragPlaceholder } from '@angular/cdk/drag-drop';
 import {Component, Directive, EventEmitter, Input, Output} from '@angular/core';
-import {AbstractControl, NG_VALIDATORS, Validator, ValidationErrors} from '@angular/forms';
-import {MatIconModule} from '@angular/material/icon';
+import { AbstractControl, NG_VALIDATORS, Validator, ValidationErrors, FormsModule } from '@angular/forms';
+import { MatIconModule, MatIcon } from '@angular/material/icon';
 
 import {planQuery, QueryPlan} from '../gql/engine';
 import {quoteIdentifier} from '../gql/formatter';
 import {parseQuery} from '../gql/parser';
 import {createTransformation, Transformation} from '../transformation';
+import { MatButton } from '@angular/material/button';
+import { MatInput } from '@angular/material/input';
+import { MatFormField, MatLabel, MatError } from '@angular/material/form-field';
+import { MatTooltip } from '@angular/material/tooltip';
+import { MatChipSet, MatChipOption, MatChipRemove } from '@angular/material/chips';
 
 @Directive({
     selector: '[gqlQuery]',
@@ -48,9 +53,11 @@ export class GqlQueryValidatorDirective implements Validator {
 }
 
 @Component({
-  selector: 'transformation-list',
-  templateUrl: './transformation-list.component.html',
-  styleUrls: ['./transformation-list.component.scss']
+    selector: 'transformation-list',
+    templateUrl: './transformation-list.component.html',
+    styleUrls: ['./transformation-list.component.scss'],
+    standalone: true,
+    imports: [MatChipSet, CdkDropList, MatChipOption, CdkDrag, MatTooltip, CdkDragPlaceholder, MatChipRemove, MatIcon, FormsModule, MatFormField, MatLabel, MatInput, GqlQueryValidatorDirective, MatError, MatButton]
 })
 export class TransformationListComponent {
     @Input() transformations: Transformation[] = [];

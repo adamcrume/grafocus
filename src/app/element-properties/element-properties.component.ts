@@ -18,11 +18,16 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 
 import { CLASS_LIST_REGEX } from '../models';
 import { parseClasses } from '../util';
+import { FormsModule } from '@angular/forms';
+import { MatInput } from '@angular/material/input';
+import { MatFormField, MatLabel } from '@angular/material/form-field';
 
 @Component({
-  selector: 'element-properties',
-  templateUrl: './element-properties.component.html',
-  styleUrls: ['./element-properties.component.scss']
+    selector: 'element-properties',
+    templateUrl: './element-properties.component.html',
+    styleUrls: ['./element-properties.component.scss'],
+    standalone: true,
+    imports: [MatFormField, MatLabel, MatInput, FormsModule]
 })
 export class ElementPropertiesComponent {
     readonly classesPattern = CLASS_LIST_REGEX;

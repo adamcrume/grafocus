@@ -29,19 +29,19 @@ describe('MessageDialogComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ MessageDialogComponent ],
-      imports: [
+    imports: [
         FormsModule,
         MatFormFieldModule,
         MatDialogModule,
         MatInputModule,
         NoopAnimationsModule,
-      ],
-      providers: [
-        {provide: MatDialogRef, useValue: {}},
-        {provide: MAT_DIALOG_DATA, useValue: []},
-      ]
-    })
+        MessageDialogComponent,
+    ],
+    providers: [
+        { provide: MatDialogRef, useValue: {} },
+        { provide: MAT_DIALOG_DATA, useValue: [] },
+    ]
+})
     .compileComponents();
 
     fixture = TestBed.createComponent(MessageDialogComponent);

@@ -44,11 +44,8 @@ describe('AppComponent', () => {
         };
 
     await TestBed.configureTestingModule({
-      declarations: [
-        AppComponent,
-        TransformationListComponent,
-      ],
-      imports: [
+    declarations: [AppComponent],
+    imports: [
         FormsModule,
         MatButtonModule,
         MatChipsModule,
@@ -62,8 +59,9 @@ describe('AppComponent', () => {
         MatToolbarModule,
         MatTooltipModule,
         NoopAnimationsModule,
-      ],
-    }).compileComponents();
+        TransformationListComponent,
+    ],
+}).compileComponents();
     });
 
     afterEach(() => {

@@ -28,16 +28,14 @@ describe('ElementPropertiesComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [
-          ElementPropertiesComponent,
-      ],
-      imports: [
-          FormsModule,
-          MatFormFieldModule,
-          MatInputModule,
-          NoopAnimationsModule,
-      ],
-    })
+    imports: [
+        FormsModule,
+        MatFormFieldModule,
+        MatInputModule,
+        NoopAnimationsModule,
+        ElementPropertiesComponent,
+    ],
+})
     .compileComponents();
 
     fixture = TestBed.createComponent(ElementPropertiesComponent);

@@ -26,15 +26,15 @@ describe('HelpDialogComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-        declarations: [ HelpDialogComponent ],
-      imports: [
+    imports: [
         MatDialogModule,
         NoopAnimationsModule,
-      ],
-      providers: [
-        {provide: MatDialogRef, useValue: {}},
-      ]
-    })
+        HelpDialogComponent,
+    ],
+    providers: [
+        { provide: MatDialogRef, useValue: {} },
+    ]
+})
     .compileComponents();
 
     fixture = TestBed.createComponent(HelpDialogComponent);

@@ -15,9 +15,14 @@
  */
 
 import { Component, Inject } from '@angular/core';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogRef, MatDialogTitle, MatDialogContent, MatDialogActions } from '@angular/material/dialog';
 
 import { ID_REGEX } from '../models';
+import { MatButton } from '@angular/material/button';
+import { FormsModule } from '@angular/forms';
+import { MatInput } from '@angular/material/input';
+import { MatFormField, MatLabel } from '@angular/material/form-field';
+import { CdkScrollable } from '@angular/cdk/scrolling';
 
 export interface CreateNodeDialogInput {
     id: string,
@@ -32,9 +37,11 @@ export interface CreateNodeDialogOutput {
 }
 
 @Component({
-  selector: 'create-node-dialog',
-  templateUrl: './create-node-dialog.component.html',
-  styleUrls: ['./create-node-dialog.component.scss']
+    selector: 'create-node-dialog',
+    templateUrl: './create-node-dialog.component.html',
+    styleUrls: ['./create-node-dialog.component.scss'],
+    standalone: true,
+    imports: [MatDialogTitle, CdkScrollable, MatDialogContent, MatFormField, MatLabel, MatInput, FormsModule, MatDialogActions, MatButton]
 })
 export class CreateNodeDialogComponent {
     readonly idPattern = ID_REGEX;

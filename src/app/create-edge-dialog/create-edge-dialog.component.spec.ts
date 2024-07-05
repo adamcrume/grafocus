@@ -29,21 +29,19 @@ describe('CreateEdgeDialogComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [
-        CreateEdgeDialogComponent,
-      ],
-      imports: [
+    imports: [
         FormsModule,
         MatFormFieldModule,
         MatDialogModule,
         MatInputModule,
         NoopAnimationsModule,
-      ],
-      providers: [
-        {provide: MatDialogRef, useValue: {}},
-        {provide: MAT_DIALOG_DATA, useValue: []},
-      ]
-    })
+        CreateEdgeDialogComponent,
+    ],
+    providers: [
+        { provide: MatDialogRef, useValue: {} },
+        { provide: MAT_DIALOG_DATA, useValue: [] },
+    ]
+})
     .compileComponents();
 
     fixture = TestBed.createComponent(CreateEdgeDialogComponent);

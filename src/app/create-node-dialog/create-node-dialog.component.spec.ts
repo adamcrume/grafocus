@@ -29,21 +29,19 @@ describe('CreateNodeDialogComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [
-        CreateNodeDialogComponent,
-      ],
-      imports: [
+    imports: [
         FormsModule,
         MatFormFieldModule,
         MatDialogModule,
         MatInputModule,
         NoopAnimationsModule,
-      ],
-      providers: [
-        {provide: MatDialogRef, useValue: {}},
-        {provide: MAT_DIALOG_DATA, useValue: []},
-      ]
-    })
+        CreateNodeDialogComponent,
+    ],
+    providers: [
+        { provide: MatDialogRef, useValue: {} },
+        { provide: MAT_DIALOG_DATA, useValue: [] },
+    ]
+})
     .compileComponents();
 
     fixture = TestBed.createComponent(CreateNodeDialogComponent);
