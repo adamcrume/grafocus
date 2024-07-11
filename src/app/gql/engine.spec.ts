@@ -485,6 +485,26 @@ describe('execute', () => {
         ]);
     });
 
+    it('can filter by multiple negated path existence', () => {
+        const graph = newGraph()
+            .createNode('n1')
+            .createNode('n2')
+            .createNode('n3')
+            .createNode('n4')
+            .createEdge('e1', 'n1', 'n2')
+            .createEdge('e2', 'n2', 'n3')
+            .createEdge('e3', 'n3', 'n4');
+        const query = 'match (x), (y) where not (x)--(y) and not (x)--()--(y) return x, y';
+        expect(executeQuery(query, graph).data).toEqual([
+            ['n1', 'n1'],
+            ['n1', 'n4'],
+            ['n2', 'n2'],
+            ['n3', 'n3'],
+            ['n4', 'n1'],
+            ['n4', 'n4'],
+        ]);
+    });
+
     it('counts nodes visited', () => {
         const graph = newGraph()
             .createNode('n1')

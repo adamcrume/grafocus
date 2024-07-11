@@ -126,12 +126,23 @@ export interface Not {
     value: Expression,
 }
 
+export interface And {
+    kind: 'and',
+    value: Expression[],
+}
+
 export interface PathExpression {
     kind: 'path',
     value: Path,
 }
 
-export type Expression = StringLiteral | NumberLiteral | Identifier | Not | PathExpression;
+export type Expression =
+    And |
+    Identifier |
+    Not |
+    NumberLiteral |
+    PathExpression |
+    StringLiteral;
 
 export type MapLiteral = Array<[string, Expression]>;
 

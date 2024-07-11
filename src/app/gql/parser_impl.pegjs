@@ -225,11 +225,31 @@ doubleQuoteLiteral = '"' chars:(escapeSequence / [^"\\])* '"' {
 
 stringLiteral = singleQuoteLiteral / doubleQuoteLiteral
 
-expression = n:numberLiteral {return {kind: 'number', value: n}} /
-             s:stringLiteral {return {kind: 'string', value: s}} /
-             "not"i sp negated:expression {return {kind: 'not', value: negated}} /
-             i:identifier {return {kind: 'identifier', value: i}} /
-             p:path {return {kind: 'path', value: p}}
+literal = n:numberLiteral {return {kind: 'number', value: n}} /
+          s:stringLiteral {return {kind: 'string', value: s}}
+
+atom = literal /
+       i:identifier {return {kind: 'identifier', value: i}} /
+       p:path {return {kind: 'path', value: p}}
+
+expression = andExpression
+
+andExpression = e:notExpression|1.., sp "and"i sp| {
+  if (e.length === 1) {
+    return e[0];
+  }
+  return {
+    kind: 'and',
+    value: e,
+  };
+}
+
+notExpression = not:("not"i sp)* a:atom {
+  if (not.length % 2) {
+    return {kind: 'not', value: a};
+  }
+  return a;
+}
 
 mapLiteral = "{" sp @(k:identifier sp ":" sp v:expression {return [k, v]})|.., sp "," sp| sp "}"
 

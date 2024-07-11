@@ -153,6 +153,10 @@ export function formatMapLiteral(map: MapLiteral): string {
     return result;
 }
 
+function formatAnd(and: Expression[]): string {
+    return and.map(formatExpression).join(' and ');
+}
+
 export function formatExpression(e: Expression): string {
     let result = '';
     if (e.kind === 'string' || e.kind === 'number') {
@@ -164,6 +168,8 @@ export function formatExpression(e: Expression): string {
         result += formatExpression(e.value);
     } else if (e.kind === 'path') {
         result += formatPath(e.value);
+    } else if (e.kind === 'and') {
+        result += formatAnd(e.value);
     } else {
         throw new Error(`Unrecognized expression: ${JSON.stringify(e)}`);
     }

@@ -347,5 +347,24 @@ describe('cypher', () => {
                 }
             });
         });
+
+        it('parses and path', () => {
+            expect(parseExpression('(x) and (y)')).toEqual({
+                kind: 'and',
+                value: [{
+                    kind: 'path',
+                    value: {
+                        nodes: [jasmine.objectContaining({name: 'x'})],
+                        edges: [],
+                    }
+                }, {
+                    kind: 'path',
+                    value: {
+                        nodes: [jasmine.objectContaining({name: 'y'})],
+                        edges: [],
+                    }
+                }]
+            });
+        });
     });
 });

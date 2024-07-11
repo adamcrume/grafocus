@@ -468,7 +468,7 @@ function intersection<T>(left: Set<T>, right: Set<T>): Set<T> {
     return result;
 }
 
-function matchPathExistence(expression: Expression): WhereStagelet {
+function matchPathExistence(expression: Expression): WhereStagelet[] {
     let path: Path;
     let inverted: boolean;
     if (expression.kind === 'path') {
@@ -477,6 +477,8 @@ function matchPathExistence(expression: Expression): WhereStagelet {
     } else if (expression.kind === 'not' && expression.value.kind === 'path') {
         path = expression.value.value;
         inverted = true;
+    } else if (expression.kind === 'and') {
+        return expression.value.map(matchPathExistence).flat();
     } else {
         throw new Error(`Unimplemented WHERE clause: ${JSON.stringify(expression)}`);
     }
@@ -486,7 +488,7 @@ function matchPathExistence(expression: Expression): WhereStagelet {
     if (path.nodes[0].name) {
         const initializer = new MoveHeadToVariable(path.nodes[0].name);
         const steps = matchSteps(path, false);
-        return {
+        return [{
             stageName: () => 'match_path_existence',
             stageChildren(): QueryPlanStage[] {
                 return [initializer, ...steps];
@@ -499,10 +501,10 @@ function matchPathExistence(expression: Expression): WhereStagelet {
                     return foundMatch !== inverted;
                 });
             }
-        };
+        }];
     }
     const stagelet = planReadPath(path);
-    return {
+    return [{
         stageName: () => 'match_path_existence',
         stageChildren(): QueryPlanStage[] {
             return [stagelet, {
@@ -516,7 +518,7 @@ function matchPathExistence(expression: Expression): WhereStagelet {
             const newMatches = stagelet.execute(previousMatches, graph, queryStats);
             return joinMatches(newMatches, matches);
         },
-    };
+    }];
 }
 
 class MatchNode extends MatchStep {
@@ -787,15 +789,15 @@ function planReadPath(path: Path): Stagelet {
 
 function planRead(read: ReadClause): Stage {
     const stages = read.paths.map(planReadPath);
-    let where: WhereStagelet|undefined = undefined;
+    let wheres: WhereStagelet[] = [];
     if (read.where) {
-        where = matchPathExistence(read.where);
+        wheres = matchPathExistence(read.where);
     }
     return {
         stageName: () => 'read',
         stageChildren(): QueryPlanStage[] {
             let children: QueryPlanStage[] = stages;
-            return children.concat(where ? [where] : []);
+            return children.concat(wheres);
         },
         stageData: () => null,
         execute(state: State): void {
@@ -803,7 +805,7 @@ function planRead(read: ReadClause): Stage {
             for (const stage of stages) {
                 matches = stage.execute(matches, state.graph, state.queryStats);
             }
-            if (where) {
+            for (const where of wheres) {
                 matches = where.execute(state.matches, matches, state.graph, state.queryStats);
             }
             state.matches = matches;

@@ -38,6 +38,14 @@ describe('formatExpression', () => {
         expect(reformat('not x')).toEqual('not x');
     });
 
+    it('formats and', () => {
+        expect(reformat('x and y')).toEqual('x and y');
+    });
+
+    it('formats not and', () => {
+        expect(reformat('not x and y')).toEqual('not x and y');
+    });
+
     it('formats paths', () => {
         expect(reformat('()--()')).toEqual('()--()');
     });
