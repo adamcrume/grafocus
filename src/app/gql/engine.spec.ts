@@ -555,6 +555,37 @@ describe('execute', () => {
         }));
     });
 
+    it('can filter by negated anded quantified path existence', () => {
+        const graph = newGraph()
+            .createNode('start')
+            .createNode('n1')
+            .createNode('n2')
+            .createNode('n3')
+            .createNode('n4')
+            .createNode('n5')
+            .createNode('n6')
+            .createNode('end')
+            .createEdge('e1', 'start', 'n1')
+            .createEdge('e2', 'n1', 'n2')
+            .createEdge('e3', 'n2', 'end')
+            .createEdge('e4', 'n3', 'n4')
+            .createEdge('e5', 'n4', 'end')
+            .createEdge('e6', 'start', 'n5')
+            .createEdge('e7', 'n5', 'n6')
+        ;
+        const query = 'match (x) where not (({_ID:"start"})-->*(x) and (x)-->*({_ID:"end"})) return x';
+        const {stats, data} = executeQuery(query, graph);
+        expect(data).toEqual([
+            ['n3'],
+            ['n4'],
+            ['n5'],
+            ['n6'],
+        ]);
+        expect(stats).toEqual(jasmine.objectContaining({
+            nodesVisited: 20,
+        }));
+    });
+
     it('can filter by labeled quantified path existence', () => {
         const graph = newGraph()
             .createNode('start')
