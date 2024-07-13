@@ -15,7 +15,7 @@
  */
 
 import Immutable from 'immutable';
-import {formatExpression, formatLabelExpression, formatMapLiteral, formatPath, formatRemoveItem, formatSetItem, quoteIdentifier} from './formatter';
+import {formatEdge, formatExpression, formatLabelExpression, formatMapLiteral, formatPath, formatRemoveItem, formatSetItem, quoteIdentifier} from './formatter';
 import {Edge, Graph, GraphMutation, Node} from './graph';
 import {Create, Direction, Edge as ASTEdge, Expression, Delete, LabelExpression, Node as ASTNode, Path, Query as ASTQuery, ReadClause, RemoveClause, ReturnClause, SetClause, UpdateClause} from './parser';
 import {booleanValue, checkCastNodeRef, EdgeRef, edgeRefValue, listValue, NodeRef, nodeRefValue, numberValue, serializeValue, stringValue, tryCastBoolean, tryCastEdgeRef, tryCastNodeRef, Value} from './values';
@@ -284,6 +284,81 @@ function edgeMatches(edge: Edge<Value>, pattern: ASTEdge): boolean {
     return true;
 }
 
+class BuildReachabilitySet implements QueryPlanStage {
+    constructor(private readonly id: string,
+                private readonly edge: ASTEdge) {
+    }
+
+    stageName(): string {
+        return 'build_reachability_set';
+    }
+
+    stageChildren(): QueryPlanStage[] {
+        return [];
+    }
+
+    stageData(): QueryPlanStageData {
+        return [['id', this.id],
+                ['edge', formatEdge(this.edge)]];
+    }
+
+    build(graph: Graph<Value>, queryStats: QueryStatsState): Set<string> {
+        const start = graph.getNodeByID(this.id);
+        const queue = [start];
+        const nodes = new Set<string>();
+        queryStats.countNodeVisit();
+        nodes.add(this.id);
+        while (true) {
+            const head = queue.pop();
+            if (!head) {
+                break;
+            }
+            const edges = [];
+            for (const [edge, next] of graph.outgoingNeighbors(head)) {
+                edges.push({edge, next, forbiddenDirection: 'LEFT'});
+            }
+            for (const [edge, next] of graph.incomingNeighbors(head)) {
+                edges.push({edge, next, forbiddenDirection: 'RIGHT'});
+            }
+            for (const {edge, next, forbiddenDirection} of edges) {
+                if (this.edge.direction !== forbiddenDirection && edgeMatches(edge, this.edge)) {
+                    if (!nodes.has(next.id)) {
+                        queryStats.countNodeVisit();
+                        queue.push(next);
+                        nodes.add(next.id);
+                    }
+                }
+
+            }
+        }
+        return nodes;
+    }
+}
+
+class CheckReachabilitySet implements QueryPlanStage {
+    constructor(private readonly name: string) {}
+
+    stageName(): string {
+        return 'check_reachability_set';
+    }
+
+    stageChildren(): QueryPlanStage[] {
+        return [];
+    }
+
+    stageData(): QueryPlanStageData {
+        return [['name', this.name]];
+    }
+
+    matches(reachability: Set<string>, match: Match): boolean {
+        const id = checkCastNodeRef(match.get(this.name));
+        if (id === undefined) {
+            return false;
+        }
+        return reachability.has(id);
+    }
+}
+
 abstract class MatchStep implements QueryPlanStage {
     abstract stageName(): string;
     abstract stageChildren(): QueryPlanStage[];
@@ -481,6 +556,36 @@ function matchPathExistence(expression: Expression): WhereStagelet[] {
         return expression.value.map(matchPathExistence).flat();
     } else {
         throw new Error(`Unimplemented WHERE clause: ${JSON.stringify(expression)}`);
+    }
+    if (path.nodes.length === 2 &&
+        path.edges[0].quantifier?.min === 0 &&
+        path.edges[0].quantifier?.max === 1/0 &&
+        !path.edges[0].name) {
+        const last = path.nodes.length - 1;
+        const firstID = fixedID(path.nodes[0]);
+        const lastID = fixedID(path.nodes[last]);
+        const goodForward = firstID && path.nodes[last].name && nodeOnlyMatchesID(path.nodes[0]);
+        const goodBackward = lastID && path.nodes[0].name && nodeOnlyMatchesID(path.nodes[last]);
+        if (goodForward || goodBackward) {
+            let startID = firstID;
+            if (!goodForward) {
+                startID = lastID;
+                path = reversePath(path);
+            }
+            const build = new BuildReachabilitySet(startID ?? '', path.edges[0]);
+            const check = new CheckReachabilitySet(path.nodes[last].name ?? '');
+            return [{
+                stageName: () => 'match_path_existence',
+                stageChildren(): QueryPlanStage[] {
+                    return [build, check];
+                },
+                stageData: () => [['inverted', inverted.toString()]],
+                execute(previousMatches: Match[], matches: Match[], graph: Graph<Value>, queryStats: QueryStatsState): Match[] {
+                    const reachabilitySet = build.build(graph, queryStats);
+                    return matches.filter(m => check.matches(reachabilitySet, m) !== inverted);
+                },
+            }];
+        }
     }
     if (!path.nodes[0].name && path.nodes[path.nodes.length - 1].name) {
         path = reversePath(path);
@@ -756,6 +861,12 @@ function fixedID(node: ASTNode): string|undefined {
         return idExpression.value;
     }
     return undefined;
+}
+
+function nodeOnlyMatchesID(node: ASTNode): boolean {
+    return node.name === null &&
+        node.label === null &&
+        !node.properties?.some(([k, v]) => k !== '_ID');
 }
 
 function planReadPath(path: Path): Stagelet {

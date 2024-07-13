@@ -90,7 +90,7 @@ function formatNode(n: Node): string {
     return result;
 }
 
-function formatEdge(e: Edge): string {
+export function formatEdge(e: Edge): string {
     let result = '';
     if (e.direction === 'LEFT') {
         result += '<';
@@ -120,8 +120,9 @@ function formatEdge(e: Edge): string {
     if (e.quantifier) {
         if (e.quantifier.min === 0 && e.quantifier.max === 1/0) {
             result += '*';
+        } else {
+            throw new Error(`Unsupported quantifier: min=${e.quantifier.min}, max=${e.quantifier.max}`);
         }
-        throw new Error(`Unsupported quantifier: ${JSON.stringify(e.quantifier)}`);
     }
     return result;
 }

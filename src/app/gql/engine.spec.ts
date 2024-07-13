@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {describeQueryPlan, planQuery, QueryOptions} from './engine';
+import {describeQueryPlan, planQuery, QueryOptions, QueryStats} from './engine';
 import {Edge, Graph, Node} from './graph';
 import {NUMBER} from './types';
 import {checkCastEdgeRef, checkCastList, checkCastNodeRef, checkCastString, numberValue, stringValue, tryCastList, tryCastNodeRef, tryCastEdgeRef, Value} from './values';
@@ -63,9 +63,9 @@ function sortedNodeRows(result: Value[][]|undefined): string[][] {
     return sortStringArrays(nodeRows(result));
 }
 
-function executeQuery(query: string, graph: Graph<Value>, options?: QueryOptions): {graph: Graph<Value>, data: string[][]} {
-    const {graph: graph2, data} = planQuery(parseQuery(query), options).execute(graph);
-    return {graph: graph2, data: sortedNodeRows(data)};
+function executeQuery(query: string, graph: Graph<Value>, options?: QueryOptions): {graph: Graph<Value>, data: string[][], stats: QueryStats} {
+    const {graph: graph2, data, stats} = planQuery(parseQuery(query), options).execute(graph);
+    return {graph: graph2, data: sortedNodeRows(data), stats};
 }
 
 describe('describeQueryPlan', () => {
@@ -483,6 +483,115 @@ describe('execute', () => {
         expect(executeQuery(query, graph).data).toEqual([
             ['n3'],
         ]);
+    });
+
+    it('can filter by quantified path existence with ID at start', () => {
+        const graph = newGraph()
+            .createNode('start')
+            .createNode('n1')
+            .createNode('n2')
+            .createNode('n3')
+            .createNode('n4')
+            .createNode('end')
+            .createEdge('e1', 'start', 'n1')
+            .createEdge('e2', 'n1', 'n2')
+            .createEdge('e3', 'n2', 'end')
+            .createEdge('e4', 'n3', 'n4')
+            .createEdge('e5', 'n4', 'end');
+        const query = 'match (x) where ({_ID:"start"})-->*(x) return x';
+        const {stats, data} = executeQuery(query, graph);
+        expect(data).toEqual([
+            ['end'],
+            ['n1'],
+            ['n2'],
+            ['start'],
+        ]);
+        expect(stats).toEqual(jasmine.objectContaining({
+            nodesVisited: 10,
+        }));
+    });
+
+    it('can filter by quantified path existence with ID at end', () => {
+        const graph = newGraph()
+            .createNode('start')
+            .createNode('n1')
+            .createNode('n2')
+            .createNode('n3')
+            .createNode('n4')
+            .createNode('end')
+            .createEdge('e1', 'start', 'n1')
+            .createEdge('e2', 'n1', 'n2')
+            .createEdge('e3', 'n2', 'end')
+            .createEdge('e4', 'start', 'n3')
+            .createEdge('e5', 'n3', 'n4');
+        const query = 'match (x) where (x)-->*({_ID:"end"}) return x';
+        const {stats, data} = executeQuery(query, graph);
+        expect(data).toEqual([
+            ['end'],
+            ['n1'],
+            ['n2'],
+            ['start'],
+        ]);
+        expect(stats).toEqual(jasmine.objectContaining({
+            nodesVisited: 10,
+        }));
+    });
+
+    it('can filter by negated quantified path existence', () => {
+        const graph = newGraph()
+            .createNode('start')
+            .createNode('n1')
+            .createNode('n2')
+            .createNode('n3')
+            .createNode('n4')
+            .createNode('end')
+            .createEdge('e1', 'start', 'n1')
+            .createEdge('e2', 'n1', 'n2')
+            .createEdge('e3', 'n2', 'end')
+            .createEdge('e4', 'n3', 'n4')
+            .createEdge('e5', 'n4', 'end');
+        const query = 'match (x) where not ({_ID:"start"})-->*(x) return x';
+        const {stats, data} = executeQuery(query, graph);
+        expect(data).toEqual([
+            ['n3'],
+            ['n4'],
+        ]);
+        expect(stats).toEqual(jasmine.objectContaining({
+            nodesVisited: 10,
+        }));
+    });
+
+    it('can filter by labeled quantified path existence', () => {
+        const graph = newGraph()
+            .createNode('start')
+            .createNode('n1a')
+            .createNode('n1b')
+            .createNode('n2a')
+            .createNode('n2b')
+            .createNode('n3a')
+            .createNode('n3b')
+            .createNode('n4a')
+            .createNode('n4b')
+            .createEdge('e1a', 'start', 'n1a')
+            .createEdge('e1b', 'n1a', 'n1b')
+            .createEdge('e2a', 'start', 'n2a')
+            .createEdge('e2b', 'n2a', 'n2b', ['foo'])
+            .createEdge('e3a', 'start', 'n3a', ['foo'])
+            .createEdge('e3b', 'n3a', 'n3b')
+            .createEdge('e4a', 'start', 'n4a', ['foo'])
+            .createEdge('e4b', 'n4a', 'n4b', ['foo'])
+        ;
+        const query = 'match (x) where ({_ID:"start"})-[:foo]->*(x) return x';
+        const {stats, data} = executeQuery(query, graph);
+        expect(data).toEqual([
+            ['n3a'],
+            ['n4a'],
+            ['n4b'],
+            ['start'],
+        ]);
+        expect(stats).toEqual(jasmine.objectContaining({
+            nodesVisited: 13,
+        }));
     });
 
     it('can filter by multiple negated path existence', () => {
