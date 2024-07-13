@@ -537,6 +537,19 @@ export class AppComponent implements OnInit, OnDestroy {
                     selector: 'node',
                     // Must be set so we don't get an error about no function and no submenu items.
                     onClickFunction: () => {},
+                },
+                {
+                    id: 'show-between',
+                    content: 'Show only nodes between...',
+                    selector: 'node',
+                    onClickFunction: (e: cytoscape.EventObject) => {
+                        const sourceID = e.target.id();
+                        cy.nodes().once('click', (e2: cytoscape.EventObject) => {
+                            const targetID = e2.target.id();
+                            this.addTransformation(`show only nodes between ${sourceID} and ${targetID}`,
+                                                   `MATCH (n) WHERE NOT (({_ID:${quoteIdentifier(sourceID)}})-[:!_VIRTUAL]->*(n) AND (n)-[:!_VIRTUAL]->*({_ID:${quoteIdentifier(targetID)}})) DELETE n`);
+                        });
+                    },
                     hasTrailingDivider: true,
                 },
                 {
