@@ -366,5 +366,27 @@ describe('cypher', () => {
                 }]
             });
         });
+
+        it('parses not and path', () => {
+            expect(parseExpression('not ((x) and (y))')).toEqual({
+                kind: 'not',
+                value: {
+                    kind: 'and',
+                    value: [{
+                        kind: 'path',
+                        value: {
+                            nodes: [jasmine.objectContaining({name: 'x'})],
+                            edges: [],
+                        }
+                    }, {
+                        kind: 'path',
+                        value: {
+                            nodes: [jasmine.objectContaining({name: 'y'})],
+                            edges: [],
+                        }
+                    }],
+                },
+            });
+        });
     });
 });

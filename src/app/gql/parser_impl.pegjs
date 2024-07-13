@@ -230,7 +230,8 @@ literal = n:numberLiteral {return {kind: 'number', value: n}} /
 
 atom = literal /
        i:identifier {return {kind: 'identifier', value: i}} /
-       p:path {return {kind: 'path', value: p}}
+       p:path {return {kind: 'path', value: p}} /
+       "(" @expression ")"
 
 expression = andExpression
 
