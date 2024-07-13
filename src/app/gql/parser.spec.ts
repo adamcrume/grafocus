@@ -388,5 +388,24 @@ describe('cypher', () => {
                 },
             });
         });
+
+        it('parses or path', () => {
+            expect(parseExpression('(x) or (y)')).toEqual({
+                kind: 'or',
+                value: [{
+                    kind: 'path',
+                    value: {
+                        nodes: [jasmine.objectContaining({name: 'x'})],
+                        edges: [],
+                    }
+                }, {
+                    kind: 'path',
+                    value: {
+                        nodes: [jasmine.objectContaining({name: 'y'})],
+                        edges: [],
+                    }
+                }]
+            });
+        });
     });
 });

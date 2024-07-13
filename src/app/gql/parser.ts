@@ -131,6 +131,11 @@ export interface And {
     value: Expression[],
 }
 
+export interface Or {
+    kind: 'or',
+    value: Expression[],
+}
+
 export interface PathExpression {
     kind: 'path',
     value: Path,
@@ -141,6 +146,7 @@ export type Expression =
     Identifier |
     Not |
     NumberLiteral |
+    Or |
     PathExpression |
     StringLiteral;
 

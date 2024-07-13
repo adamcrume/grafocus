@@ -639,6 +639,28 @@ describe('execute', () => {
         ]);
     });
 
+    it('can filter by OR-ed path existence', () => {
+        const graph = newGraph()
+            .createNode('n1')
+            .createNode('n2')
+            .createNode('n2foo', ['foo'])
+            .createNode('n3')
+            .createNode('n3bar', ['bar'])
+            .createNode('n4')
+            .createNode('n4foo', ['foo'])
+            .createNode('n4bar', ['bar'])
+            .createEdge('e2foo', 'n2', 'n2foo')
+            .createEdge('e3bar', 'n3', 'n3bar')
+            .createEdge('e4foo', 'n4', 'n4foo')
+            .createEdge('e4bar', 'n4', 'n4bar');
+        const query = 'match (x) where (x)--(:foo) or (x)--(:bar) return x';
+        expect(executeQuery(query, graph).data).toEqual([
+            ['n2'],
+            ['n3'],
+            ['n4'],
+        ]);
+    });
+
     it('counts nodes visited', () => {
         const graph = newGraph()
             .createNode('n1')

@@ -233,7 +233,17 @@ atom = literal /
        p:path {return {kind: 'path', value: p}} /
        "(" @expression ")"
 
-expression = andExpression
+expression = orExpression
+
+orExpression = e:andExpression|1.., sp "or"i sp| {
+  if (e.length === 1) {
+    return e[0];
+  }
+  return {
+    kind: 'or',
+    value: e,
+  };
+}
 
 andExpression = e:notExpression|1.., sp "and"i sp| {
   if (e.length === 1) {

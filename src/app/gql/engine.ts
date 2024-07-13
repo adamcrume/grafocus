@@ -581,6 +581,19 @@ function filterByExpression(expression: Expression): FilterStage {
                 return match => childFilters.every(c => c(match));
             },
         };
+    } else if (expression.kind === 'or') {
+        const children = expression.value.map(filterByExpression);
+        return {
+            stageName: () => 'filter_or',
+            stageChildren(): QueryPlanStage[] {
+                return children;
+            },
+            stageData: () => [],
+            execute(graph: Graph<Value>, queryStats: QueryStatsState): (match: Match) => boolean {
+                const childFilters = children.map(c => c.execute(graph, queryStats));
+                return match => childFilters.some(c => c(match));
+            },
+        };
     } else {
         throw new Error(`Unimplemented WHERE clause: ${JSON.stringify(expression)}`);
     }

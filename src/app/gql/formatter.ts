@@ -158,6 +158,10 @@ function formatAnd(and: Expression[]): string {
     return and.map(formatExpression).join(' and ');
 }
 
+function formatOr(or: Expression[]): string {
+    return or.map(formatExpression).join(' or ');
+}
+
 export function formatExpression(e: Expression): string {
     let result = '';
     if (e.kind === 'string' || e.kind === 'number') {
@@ -171,6 +175,8 @@ export function formatExpression(e: Expression): string {
         result += formatPath(e.value);
     } else if (e.kind === 'and') {
         result += formatAnd(e.value);
+    } else if (e.kind === 'or') {
+        result += formatOr(e.value);
     } else {
         throw new Error(`Unrecognized expression: ${JSON.stringify(e)}`);
     }

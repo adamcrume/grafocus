@@ -46,6 +46,10 @@ describe('formatExpression', () => {
         expect(reformat('not x and y')).toEqual('not x and y');
     });
 
+    it('formats or', () => {
+        expect(reformat('x or y')).toEqual('x or y');
+    });
+
     it('formats paths', () => {
         expect(reformat('()--()')).toEqual('()--()');
     });
