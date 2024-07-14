@@ -608,20 +608,15 @@ function matchPathExistence(expression: Expression): WhereStagelet[] {
             }
         }];
     }
-    const stagelet = planReadPath(path);
+    const stagelet = planReadPath(path, false);
     return [{
         stageName: () => 'match_path_existence',
         stageChildren(): QueryPlanStage[] {
-            return [stagelet, {
-                stageName: () => 'join',
-                stageChildren: () => [],
-                stageData: () => null,
-            }];
+            return [stagelet];
         },
         stageData: () => null,
         execute(previousMatches: Match[], matches: Match[], graph: Graph<Value>, queryStats: QueryStatsState): Match[] {
-            const newMatches = stagelet.execute(previousMatches, graph, queryStats);
-            return joinMatches(newMatches, matches);
+            return stagelet.execute(matches, graph, queryStats);
         },
     }];
 }
@@ -869,7 +864,7 @@ function nodeOnlyMatchesID(node: ASTNode): boolean {
         !node.properties?.some(([k, v]) => k !== '_ID');
 }
 
-function planReadPath(path: Path): Stagelet {
+function planReadPath(path: Path, allowNewVariables: boolean): Stagelet {
     const firstID = fixedID(path.nodes[0]);
     const lastID = fixedID(path.nodes[path.nodes.length - 1]);
     let initializer: MatchInitializer;
@@ -881,7 +876,7 @@ function planReadPath(path: Path): Stagelet {
     } else {
         initializer = new ScanGraph();
     }
-    const steps = matchSteps(path, true);
+    const steps = matchSteps(path, allowNewVariables);
     return {
         stageName: () => 'read_path',
         stageChildren(): QueryPlanStage[] {
@@ -899,7 +894,7 @@ function planReadPath(path: Path): Stagelet {
 }
 
 function planRead(read: ReadClause): Stage {
-    const stages = read.paths.map(planReadPath);
+    const stages = read.paths.map(p => planReadPath(p, true));
     let wheres: WhereStagelet[] = [];
     if (read.where) {
         wheres = matchPathExistence(read.where);

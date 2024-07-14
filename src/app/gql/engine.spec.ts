@@ -95,7 +95,7 @@ return: n1, n3
 `);
     });
 
-    it('can describe joins', () => {
+    it('can describe path existence', () => {
         const plan = planQuery(parseQuery('match (x) where ()-->(x)-->() return x'));
         expect(describeQueryPlan(plan)).toEqual(
 `read
@@ -110,12 +110,11 @@ return: n1, n3
       match_node: name=x
       match_edge: direction=RIGHT
       match_node
-    join
 return: x
 `);
     });
 
-    it('can describe joins with path starting at ID', () => {
+    it('can describe path existence with path starting at ID', () => {
         const plan = planQuery(parseQuery('match (x) where ({_ID:"y"})-->(x)-->(:Foo) return x'));
         expect(describeQueryPlan(plan)).toEqual(
 `read
@@ -130,12 +129,11 @@ return: x
       match_node: name=x
       match_edge: direction=RIGHT
       match_node: label=Foo
-    join
 return: x
 `);
     });
 
-    it('can describe joins with path ending at ID', () => {
+    it('can describe path existence with path ending at ID', () => {
         const plan = planQuery(parseQuery('match (x) where (:Foo)-->(x)-->({_ID:"y"}) return x'));
         expect(describeQueryPlan(plan)).toEqual(
 `read
@@ -150,7 +148,6 @@ return: x
       match_node: name=x
       match_edge: direction=LEFT
       match_node: label=Foo
-    join
 return: x
 `);
     });
