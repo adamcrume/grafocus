@@ -553,14 +553,21 @@ function filterMatches(filter: FilterStage): Stagelet {
 }
 
 function filterByExpression(expression: Expression): FilterStage {
-    let path: Path;
-    let inverted: boolean;
     if (expression.kind === 'path') {
-        path = expression.value;
-        inverted = false;
-    } else if (expression.kind === 'not' && expression.value.kind === 'path') {
-        path = expression.value.value;
-        inverted = true;
+        return filterByPathExistence(expression.value);
+    } else if (expression.kind === 'not') {
+        const child = filterByExpression(expression.value);
+        return {
+            stageName: () => 'filter_not',
+            stageChildren(): QueryPlanStage[] {
+                return [child];
+            },
+            stageData: () => [],
+            execute(graph: Graph<Value>, queryStats: QueryStatsState): (match: Match) => boolean {
+                const childFilter = child.execute(graph, queryStats);
+                return match => !childFilter(match);
+            },
+        };
     } else if (expression.kind === 'and') {
         const children = expression.value.map(filterByExpression);
         return {
@@ -577,6 +584,9 @@ function filterByExpression(expression: Expression): FilterStage {
     } else {
         throw new Error(`Unimplemented WHERE clause: ${JSON.stringify(expression)}`);
     }
+}
+
+function filterByPathExistence(path: Path): FilterStage {
     if (path.nodes.length === 2 &&
         path.edges[0].quantifier?.min === 0 &&
         path.edges[0].quantifier?.max === 1/0 &&
@@ -599,10 +609,10 @@ function filterByExpression(expression: Expression): FilterStage {
                 stageChildren(): QueryPlanStage[] {
                     return [build, check];
                 },
-                stageData: () => [['inverted', inverted.toString()]],
+                stageData: () => [],
                 execute(graph: Graph<Value>, queryStats: QueryStatsState): (match: Match) => boolean {
                     const reachabilitySet = build.build(graph, queryStats);
-                    return m => check.matches(reachabilitySet, m) !== inverted;
+                    return m => check.matches(reachabilitySet, m);
                 },
             };
         }
@@ -633,8 +643,7 @@ function filterByExpression(expression: Expression): FilterStage {
         execute(graph: Graph<Value>, queryStats: QueryStatsState): (match: Match) => boolean {
             return match => {
                 const expanded = expandMatch(initializer, steps, match, graph, queryStats);
-                const foundMatch = !expanded.next().done;
-                return foundMatch !== inverted;
+                return !expanded.next().done;
             };
         },
     };
