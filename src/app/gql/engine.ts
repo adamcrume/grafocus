@@ -211,6 +211,10 @@ interface Stagelet extends QueryPlanStage {
     execute(matches: Match[], graph: Graph<Value>, queryStats: QueryStatsState): Match[];
 }
 
+interface FilterStage extends QueryPlanStage {
+    execute(graph: Graph<Value>, queryStats: QueryStatsState): (match: Match) => boolean;
+}
+
 function labelsMatch(labels: Immutable.Set<string>, pattern: LabelExpression): boolean {
     if (pattern.kind === 'identifier') {
         if (pattern.value === '_VIRTUAL') {
@@ -539,7 +543,16 @@ function intersection<T>(left: Set<T>, right: Set<T>): Set<T> {
     return result;
 }
 
-function matchPathExistence(expression: Expression): Stagelet[] {
+function filterMatches(filter: FilterStage): Stagelet {
+    return {
+        ...filter,
+        execute(matches: Match[], graph: Graph<Value>, queryStats: QueryStatsState): Match[] {
+            return matches.filter(filter.execute(graph, queryStats));
+        },
+    };
+}
+
+function filterByExpression(expression: Expression): FilterStage {
     let path: Path;
     let inverted: boolean;
     if (expression.kind === 'path') {
@@ -549,7 +562,18 @@ function matchPathExistence(expression: Expression): Stagelet[] {
         path = expression.value.value;
         inverted = true;
     } else if (expression.kind === 'and') {
-        return expression.value.map(matchPathExistence).flat();
+        const children = expression.value.map(filterByExpression);
+        return {
+            stageName: () => 'filter_and',
+            stageChildren(): QueryPlanStage[] {
+                return children;
+            },
+            stageData: () => [],
+            execute(graph: Graph<Value>, queryStats: QueryStatsState): (match: Match) => boolean {
+                const childFilters = children.map(c => c.execute(graph, queryStats));
+                return match => childFilters.every(c => c(match));
+            },
+        };
     } else {
         throw new Error(`Unimplemented WHERE clause: ${JSON.stringify(expression)}`);
     }
@@ -570,17 +594,17 @@ function matchPathExistence(expression: Expression): Stagelet[] {
             }
             const build = new BuildReachabilitySet(startID ?? '', path.edges[0]);
             const check = new CheckReachabilitySet(path.nodes[last].name ?? '');
-            return [{
+            return {
                 stageName: () => 'match_path_existence',
                 stageChildren(): QueryPlanStage[] {
                     return [build, check];
                 },
                 stageData: () => [['inverted', inverted.toString()]],
-                execute(matches: Match[], graph: Graph<Value>, queryStats: QueryStatsState): Match[] {
+                execute(graph: Graph<Value>, queryStats: QueryStatsState): (match: Match) => boolean {
                     const reachabilitySet = build.build(graph, queryStats);
-                    return matches.filter(m => check.matches(reachabilitySet, m) !== inverted);
+                    return m => check.matches(reachabilitySet, m) !== inverted;
                 },
-            }];
+            };
         }
     }
     let initializer: MatchInitializer;
@@ -600,20 +624,20 @@ function matchPathExistence(expression: Expression): Stagelet[] {
         initializer = new ScanGraph();
     }
     const steps = matchSteps(path, false);
-    return [{
+    return {
         stageName: () => 'match_path_existence',
         stageChildren(): QueryPlanStage[] {
             return [initializer, ...steps];
         },
         stageData: () => null,
-        execute(matches: Match[], graph: Graph<Value>, queryStats: QueryStatsState): Match[] {
-            return matches.filter(match => {
+        execute(graph: Graph<Value>, queryStats: QueryStatsState): (match: Match) => boolean {
+            return match => {
                 const expanded = expandMatch(initializer, steps, match, graph, queryStats);
                 const foundMatch = !expanded.next().done;
                 return foundMatch !== inverted;
-            });
+            };
         },
-    }];
+    };
 }
 
 class MatchNode extends MatchStep {
@@ -890,24 +914,19 @@ function planReadPath(path: Path, allowNewVariables: boolean): Stagelet {
 
 function planRead(read: ReadClause): Stage {
     const stages = read.paths.map(p => planReadPath(p, true));
-    let wheres: Stagelet[] = [];
     if (read.where) {
-        wheres = matchPathExistence(read.where);
+        stages.push(filterMatches(filterByExpression(read.where)));
     }
     return {
         stageName: () => 'read',
         stageChildren(): QueryPlanStage[] {
-            let children: QueryPlanStage[] = stages;
-            return children.concat(wheres);
+            return stages;
         },
         stageData: () => null,
         execute(state: State): void {
             let matches = state.matches;
             for (const stage of stages) {
                 matches = stage.execute(matches, state.graph, state.queryStats);
-            }
-            for (const where of wheres) {
-                matches = where.execute(matches, state.graph, state.queryStats);
             }
             state.matches = matches;
         }
