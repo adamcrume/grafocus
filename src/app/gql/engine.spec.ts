@@ -103,13 +103,12 @@ return: n1, n3
     scan_graph
     match_node: name=x
   match_path_existence
-    read_path
-      scan_graph
-      match_node
-      match_edge: direction=RIGHT
-      match_node: name=x
-      match_edge: direction=RIGHT
-      match_node
+    scan_graph
+    match_node
+    match_edge: direction=RIGHT
+    match_node: name=x
+    match_edge: direction=RIGHT
+    match_node
 return: x
 `);
     });
@@ -122,13 +121,12 @@ return: x
     scan_graph
     match_node: name=x
   match_path_existence
-    read_path
-      move_head_to_id: y
-      match_node: properties={_ID: "y"}
-      match_edge: direction=RIGHT
-      match_node: name=x
-      match_edge: direction=RIGHT
-      match_node: label=Foo
+    move_head_to_id: y
+    match_node: properties={_ID: "y"}
+    match_edge: direction=RIGHT
+    match_node: name=x
+    match_edge: direction=RIGHT
+    match_node: label=Foo
 return: x
 `);
     });
@@ -141,13 +139,12 @@ return: x
     scan_graph
     match_node: name=x
   match_path_existence
-    read_path
-      move_head_to_id: y
-      match_node: properties={_ID: "y"}
-      match_edge: direction=LEFT
-      match_node: name=x
-      match_edge: direction=LEFT
-      match_node: label=Foo
+    move_head_to_id: y
+    match_node: properties={_ID: "y"}
+    match_edge: direction=LEFT
+    match_node: name=x
+    match_edge: direction=LEFT
+    match_node: label=Foo
 return: x
 `);
     });

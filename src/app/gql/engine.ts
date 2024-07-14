@@ -211,10 +211,6 @@ interface Stagelet extends QueryPlanStage {
     execute(matches: Match[], graph: Graph<Value>, queryStats: QueryStatsState): Match[];
 }
 
-interface WhereStagelet extends QueryPlanStage {
-    execute(previousMatches: Match[], matches: Match[], graph: Graph<Value>, queryStats: QueryStatsState): Match[];
-}
-
 function labelsMatch(labels: Immutable.Set<string>, pattern: LabelExpression): boolean {
     if (pattern.kind === 'identifier') {
         if (pattern.value === '_VIRTUAL') {
@@ -543,7 +539,7 @@ function intersection<T>(left: Set<T>, right: Set<T>): Set<T> {
     return result;
 }
 
-function matchPathExistence(expression: Expression): WhereStagelet[] {
+function matchPathExistence(expression: Expression): Stagelet[] {
     let path: Path;
     let inverted: boolean;
     if (expression.kind === 'path') {
@@ -580,43 +576,42 @@ function matchPathExistence(expression: Expression): WhereStagelet[] {
                     return [build, check];
                 },
                 stageData: () => [['inverted', inverted.toString()]],
-                execute(previousMatches: Match[], matches: Match[], graph: Graph<Value>, queryStats: QueryStatsState): Match[] {
+                execute(matches: Match[], graph: Graph<Value>, queryStats: QueryStatsState): Match[] {
                     const reachabilitySet = build.build(graph, queryStats);
                     return matches.filter(m => check.matches(reachabilitySet, m) !== inverted);
                 },
             }];
         }
     }
-    if (!path.nodes[0].name && path.nodes[path.nodes.length - 1].name) {
+    let initializer: MatchInitializer;
+    const firstID = fixedID(path.nodes[0]);
+    const lastID = fixedID(path.nodes[path.nodes.length - 1]);
+    if (firstID) {
+        initializer = new MoveHeadToID(firstID);
+    } else if (lastID) {
         path = reversePath(path);
+        initializer = new MoveHeadToID(lastID);
+    } else if (path.nodes[0].name || path.nodes[path.nodes.length - 1].name) {
+        if (!path.nodes[0].name && path.nodes[path.nodes.length - 1].name) {
+            path = reversePath(path);
+        }
+        initializer = new MoveHeadToVariable(path.nodes[0].name!);
+    } else {
+        initializer = new ScanGraph();
     }
-    if (path.nodes[0].name) {
-        const initializer = new MoveHeadToVariable(path.nodes[0].name);
-        const steps = matchSteps(path, false);
-        return [{
-            stageName: () => 'match_path_existence',
-            stageChildren(): QueryPlanStage[] {
-                return [initializer, ...steps];
-            },
-            stageData: () => null,
-            execute(previousMatches: Match[], matches: Match[], graph: Graph<Value>, queryStats: QueryStatsState): Match[] {
-                return matches.filter(match => {
-                    const matches = expandMatch(initializer, steps, match, graph, queryStats);
-                    const foundMatch = !matches.next().done;
-                    return foundMatch !== inverted;
-                });
-            }
-        }];
-    }
-    const stagelet = planReadPath(path, false);
+    const steps = matchSteps(path, false);
     return [{
         stageName: () => 'match_path_existence',
         stageChildren(): QueryPlanStage[] {
-            return [stagelet];
+            return [initializer, ...steps];
         },
         stageData: () => null,
-        execute(previousMatches: Match[], matches: Match[], graph: Graph<Value>, queryStats: QueryStatsState): Match[] {
-            return stagelet.execute(matches, graph, queryStats);
+        execute(matches: Match[], graph: Graph<Value>, queryStats: QueryStatsState): Match[] {
+            return matches.filter(match => {
+                const expanded = expandMatch(initializer, steps, match, graph, queryStats);
+                const foundMatch = !expanded.next().done;
+                return foundMatch !== inverted;
+            });
         },
     }];
 }
@@ -895,7 +890,7 @@ function planReadPath(path: Path, allowNewVariables: boolean): Stagelet {
 
 function planRead(read: ReadClause): Stage {
     const stages = read.paths.map(p => planReadPath(p, true));
-    let wheres: WhereStagelet[] = [];
+    let wheres: Stagelet[] = [];
     if (read.where) {
         wheres = matchPathExistence(read.where);
     }
@@ -912,7 +907,7 @@ function planRead(read: ReadClause): Stage {
                 matches = stage.execute(matches, state.graph, state.queryStats);
             }
             for (const where of wheres) {
-                matches = where.execute(state.matches, matches, state.graph, state.queryStats);
+                matches = where.execute(matches, state.graph, state.queryStats);
             }
             state.matches = matches;
         }
