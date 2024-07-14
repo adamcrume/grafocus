@@ -969,8 +969,31 @@ function planCreate(create: Create): Stage {
         stageData: () => formatPath(create.path),
         execute(state: State): void {
             state.graph = state.graph.withMutations(mutation => {
+                interface PartiallyEvaluatedNodePlan {
+                    name: string|null,
+                    labels: string[],
+                    properties: Array<[string, (match: Match) => Value]>,
+                }
+                interface PartiallyEvaluatedEdgePlan {
+                    srcOffset: number,
+                    dstOffset: number,
+                    labels: string[],
+                    properties: Array<[string, (match: Match) => Value]>,
+                }
+                const partiallyEvaluatedPathNodes: PartiallyEvaluatedNodePlan[] = pathNodes.map(n => ({
+                    ...n,
+                    properties: n.properties.map(([k, v]) => {
+                        return [k, v(state.graph, state.queryStats)];
+                    }),
+                }));
+                const partiallyEvaluatedPathEdges: PartiallyEvaluatedEdgePlan[] = pathEdges.map(e => ({
+                    ...e,
+                    properties: e.properties.map(([k, v]) => {
+                        return [k, v(state.graph, state.queryStats)];
+                    }),
+                }));
                 for (const match of state.matches) {
-                    const nodeIDs: string[] = pathNodes.map(n => {
+                    const nodeIDs: string[] = partiallyEvaluatedPathNodes.map(n => {
                         if (n.name !== null) {
                             const element = match.get(n.name);
                             if (!element) {
@@ -983,18 +1006,18 @@ function planCreate(create: Create): Stage {
                             return nodeRef;
                         }
                         let properties: Array<[string, Value]> = n.properties.map(([k, v]) => {
-                            return [k, v(match, state.graph, state.queryStats)];
+                            return [k, v(match)];
                         });
                         const id = state.createNodeID();
                         mutation.createNode(id, n.labels, properties);
                         return id;
                     });
-                    for (let i = 0; i < pathEdges.length; i++) {
-                        const e = pathEdges[i];
+                    for (let i = 0; i < partiallyEvaluatedPathEdges.length; i++) {
+                        const e = partiallyEvaluatedPathEdges[i];
                         const srcID = nodeIDs[e.srcOffset + i];
                         const dstID = nodeIDs[e.dstOffset + i];
                         let properties: Array<[string, Value]> = e.properties.map(([k, v]) => {
-                            return [k, v(match, state.graph, state.queryStats)];
+                            return [k, v(match)];
                         });
                         const edgeID = state.createEdgeID();
                         mutation.createEdge(edgeID, srcID, dstID, e.labels, properties);
@@ -1043,29 +1066,32 @@ function planSet(set_: SetClause): Stage {
             const variable = item.property.root;
             const property = item.property.chain[0];
             const expression = planEvaluate(item.expression);
-            return (match: Match, graph: Graph<Value>, m: GraphMutation<Value>, queryStats: QueryStatsState) => {
-                const value = match.get(variable);
-                if (!value) {
-                    throw new Error(`variable ${JSON.stringify(variable)} not defined`);
-                }
-                const nodeRef = tryCastNodeRef(value);
-                if (nodeRef !== undefined) {
-                    const v = expression(match, graph, queryStats);
-                    m.updateNodeProperties(nodeRef, p => p.set(property, v));
-                    return;
-                }
-                const edgeRef = tryCastEdgeRef(value);
-                if (edgeRef !== undefined) {
-                    const v = expression(match, graph, queryStats);
-                    m.updateEdgeProperties(edgeRef, p => p.set(property, v));
-                    return;
-                }
-                throw new Error(`variable ${JSON.stringify(variable)} is not a node or edge`);
+            return (graph: Graph<Value>, m: GraphMutation<Value>, queryStats: QueryStatsState) => {
+                const partialExpression = expression(graph, queryStats);
+                return (match: Match) => {
+                    const value = match.get(variable);
+                    if (!value) {
+                        throw new Error(`variable ${JSON.stringify(variable)} not defined`);
+                    }
+                    const nodeRef = tryCastNodeRef(value);
+                    if (nodeRef !== undefined) {
+                        const v = partialExpression(match);
+                        m.updateNodeProperties(nodeRef, p => p.set(property, v));
+                        return;
+                    }
+                    const edgeRef = tryCastEdgeRef(value);
+                    if (edgeRef !== undefined) {
+                        const v = partialExpression(match);
+                        m.updateEdgeProperties(edgeRef, p => p.set(property, v));
+                        return;
+                    }
+                    throw new Error(`variable ${JSON.stringify(variable)} is not a node or edge`);
+                };
             };
         } else {
             const variable = item.variable;
             const labels = item.labels;
-            return (match: Match, graph: Graph<Value>, m: GraphMutation<Value>) => {
+            return (graph: Graph<Value>, m: GraphMutation<Value>) => (match: Match) => {
                 const value = match.get(variable);
                 if (!value) {
                     throw new Error(`variable ${JSON.stringify(variable)} not defined`);
@@ -1096,9 +1122,10 @@ function planSet(set_: SetClause): Stage {
         stageData: () => null,
         execute(state: State): void {
             state.graph = state.graph.withMutations(m => {
+                const partialItems = items.map(item => item(state.graph, m, state.queryStats));
                 for (const match of state.matches) {
-                    for (const item of items) {
-                        item(match, state.graph, m, state.queryStats);
+                    for (const item of partialItems) {
+                        item(match);
                     }
                 }
             });
@@ -1187,17 +1214,17 @@ function planUpdate(update: UpdateClause): Stage {
     }
 }
 
-type EvaluatePlan = (variables: Match, graph: Graph<Value>, queryStats: QueryStatsState) => Value;
+type EvaluatePlan = (graph: Graph<Value>, queryStats: QueryStatsState) => (variables: Match) => Value;
 
 function planEvaluate(expression: Expression): EvaluatePlan {
     if (expression.kind === 'string') {
         const v = stringValue(expression.value);
-        return () => v;
+        return () => () => v;
     } else if (expression.kind === 'number') {
         const v = numberValue(expression.value);
-        return () => v;
+        return () => () => v;
     } else if (expression.kind === 'identifier') {
-        return (variables: Match, graph: Graph<Value>) => {
+        return (graph: Graph<Value>) => (variables: Match) => {
             const v = variables.get(expression.value);
             if (!v) {
                 throw new Error(`Variable ${JSON.stringify(expression.value)} not found`);
@@ -1206,20 +1233,23 @@ function planEvaluate(expression: Expression): EvaluatePlan {
         };
     } else if (expression.kind === 'not') {
         const inner = planEvaluate(expression.value);
-        return (variables: Match, graph: Graph<Value>, queryStats: QueryStatsState) => {
-            // TODO: test
-            const b = tryCastBoolean(inner(variables, graph, queryStats));
-            if (b === undefined) {
-                throw new Error(`Expression is not a boolean: ${JSON.stringify(expression.value)}`);
-            }
-            return booleanValue(!b);
+        return (graph: Graph<Value>, queryStats: QueryStatsState) => {
+            const evaluate = inner(graph, queryStats);
+            return (variables: Match) => {
+                // TODO: test
+                const b = tryCastBoolean(evaluate(variables));
+                if (b === undefined) {
+                    throw new Error(`Expression is not a boolean: ${JSON.stringify(expression.value)}`);
+                }
+                return booleanValue(!b);
+            };
         };
     } else if (expression.kind === 'path') {
         // TODO: test
         const steps = matchSteps(expression.value, false);
         // TODO: choose better
         const initializer = new ScanGraph();
-        return (variables: Match, graph: Graph<Value>, queryStats: QueryStatsState) => {
+        return (graph: Graph<Value>, queryStats: QueryStatsState) => (variables: Match) => {
             const matches = expandMatch(initializer, steps, variables, graph, queryStats);
             const foundMatch = !matches.next().done;
             return booleanValue(foundMatch);
@@ -1238,7 +1268,8 @@ function planReturn(returnClause: ReturnClause): Stage {
             return returnClause.values.map(formatExpression);
         },
         execute(state: State): void {
-            state.returnValue = state.matches.map(m => expressions.map(e => e(m, state.graph, state.queryStats)));
+            const partialExpressions = expressions.map(e => e(state.graph, state.queryStats));
+            state.returnValue = state.matches.map(m => partialExpressions.map(e => e(m)));
         }
     });
 }
