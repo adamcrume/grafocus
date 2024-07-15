@@ -17,6 +17,7 @@
 import Immutable from 'immutable';
 import {formatEdge, formatExpression, formatLabelExpression, formatMapLiteral, formatPath, formatRemoveItem, formatSetItem, quoteIdentifier} from './formatter';
 import {Edge, Graph, GraphMutation, Node} from './graph';
+import {iter} from './iter';
 import {Create, Direction, Edge as ASTEdge, Expression, Delete, LabelExpression, Node as ASTNode, Path, Query as ASTQuery, ReadClause, RemoveClause, ReturnClause, SetClause, UpdateClause} from './parser';
 import {booleanValue, checkCastNodeRef, EdgeRef, edgeRefValue, listValue, NodeRef, nodeRefValue, numberValue, serializeValue, stringValue, tryCastBoolean, tryCastEdgeRef, tryCastNodeRef, Value} from './values';
 
@@ -363,7 +364,7 @@ abstract class MatchStep implements QueryPlanStage {
     abstract stageName(): string;
     abstract stageChildren(): QueryPlanStage[];
     abstract stageData(): QueryPlanStageData;
-    abstract match(graph: Graph<Value>, pos: PathMatch, queryStats: QueryStatsState): PathMatch[];
+    abstract match(graph: Graph<Value>, pos: PathMatch, queryStats: QueryStatsState): IterableIterator<PathMatch>;
 }
 
 abstract class MatchInitializer implements QueryPlanStage {
@@ -492,16 +493,14 @@ class ScanGraphStep extends MatchStep {
         return null;
     }
 
-    override match(graph: Graph<Value>, pos: PathMatch): PathMatch[] {
-        let pathMatches: PathMatch[] = [];
+    override *match(graph: Graph<Value>, pos: PathMatch): IterableIterator<PathMatch> {
         for (const startNode of graph.nodes) {
-            pathMatches.push({
+            yield {
                 match: pos.match,
                 head: startNode,
                 traversedEdges: pos.traversedEdges,
-            });
+            };
         }
-        return pathMatches;
     }
 }
 
@@ -682,9 +681,9 @@ class MatchNode extends MatchStep {
                 ['properties', n.properties === null ? null : formatMapLiteral(n.properties)]];
     }
 
-    override match(graph: Graph<Value>, pos: PathMatch, queryStats: QueryStatsState): PathMatch[] {
+    override *match(graph: Graph<Value>, pos: PathMatch, queryStats: QueryStatsState): IterableIterator<PathMatch> {
         if (!nodeMatches(pos.head, this.node, queryStats)) {
-            return [];
+            return;
         }
         const name = this.node.name;
         let match = pos.match;
@@ -692,7 +691,7 @@ class MatchNode extends MatchStep {
             if (pos.match.has(name)) {
                 const old = pos.match.get(name);
                 if (tryCastNodeRef(old) !== pos.head.id) {
-                    return [];
+                    return;
                 }
             } else if (!this.allowNewVariables) {
                 throw new Error(`Attempting to bind variable ${JSON.stringify(name)} in a position where it is not allowed`);
@@ -701,11 +700,11 @@ class MatchNode extends MatchStep {
                 match.set(name, nodeRefValue(pos.head.id));
             }
         }
-        return [{
+        yield {
             match,
             traversedEdges: pos.traversedEdges,
             head: pos.head,
-        }];
+        };
     }
 }
 
@@ -731,8 +730,7 @@ class MatchEdge extends MatchStep {
                 ['quantifier', e.quantifier === null ? null : JSON.stringify(e.quantifier)]];
     }
 
-    override match(graph: Graph<Value>, pos: PathMatch, queryStats: QueryStatsState): PathMatch[] {
-        const matches = [];
+    override *match(graph: Graph<Value>, pos: PathMatch, queryStats: QueryStatsState): IterableIterator<PathMatch> {
         const edges = [];
         for (const [edge, next] of graph.outgoingNeighbors(pos.head)) {
             edges.push({edge, next, forbiddenDirection: 'LEFT'});
@@ -760,14 +758,13 @@ class MatchEdge extends MatchStep {
                 }
                 const subTraversed = new Set(pos.traversedEdges);
                 subTraversed.add(edge);
-                matches.push({
+                yield {
                     match,
                     traversedEdges: subTraversed,
                     head: next,
-                });
+                };
             }
         }
-        return matches;
     }
 }
 
@@ -788,8 +785,7 @@ class MatchQuantified extends MatchStep {
         return [['min', this.min.toString()], ['max', this.max.toString()]];
     }
 
-    override match(graph: Graph<Value>, pos: PathMatch, queryStats: QueryStatsState): PathMatch[] {
-        const result = [];
+    override *match(graph: Graph<Value>, pos: PathMatch, queryStats: QueryStatsState): IterableIterator<PathMatch> {
         const emptyVariables = new Map<string, Array<Value>>();
         for (const k of this.freeVariables) {
             emptyVariables.set(k, []);
@@ -801,7 +797,17 @@ class MatchQuantified extends MatchStep {
         let length = 0;
         while (length < this.max && matches.length) {
             if (length >= this.min) {
-                result.push(matches);
+                for (const m of matches) {
+                    const match = pos.match.clone();
+                    for (const [k, v] of m.variables) {
+                        match.set(k, listValue(v));
+                    }
+                    yield {
+                        match,
+                        head: m.pathMatch.head,
+                        traversedEdges: m.pathMatch.traversedEdges,
+                    };
+                }
             }
             const newMatches = [];
             for (const p of matches) {
@@ -811,31 +817,20 @@ class MatchQuantified extends MatchStep {
                     head: p.pathMatch.head,
                     traversedEdges: p.pathMatch.traversedEdges,
                 }, queryStats);
-                newMatches.push(innerMatches.map(m => {
+                for (const m of innerMatches) {
                     const variables = new Map(p.variables);
                     for (const [k, v] of m.match.vars) {
                         variables.set(k, [...variables.get(k) ?? [], v]);
                     }
-                    return {
+                    newMatches.push({
                         pathMatch: m,
                         variables,
-                    }
-                }));
+                    });
+                }
             }
-            matches = newMatches.flat();
+            matches = newMatches;
             length++;
         }
-        return result.flat().map(m => {
-            const match = pos.match.clone();
-            for (const [k, v] of m.variables) {
-                match.set(k, listValue(v));
-            }
-            return {
-                match,
-                head: m.pathMatch.head,
-                traversedEdges: m.pathMatch.traversedEdges,
-            };
-        });
     }
 }
 
@@ -869,20 +864,24 @@ function* expandMatch(initializer: MatchInitializer, steps: MatchStep[], match: 
         pathMatch: PathMatch,
         step: number,
     }
-    let submatches = initializer
-        .initial(match, graph)
-        .map(p => ({pathMatch: p, step: 0}));
+    let submatchIters = [
+        iter(initializer
+            .initial(match, graph))
+            .map(p => ({pathMatch: p, step: 0}))
+    ];
     while (true) {
-        const submatch = submatches.pop();
-        if (!submatch) {
+        const submatches = submatchIters.pop();
+        if (!submatches) {
             return;
         }
-        if (submatch.step == steps.length) {
-            yield submatch.pathMatch.match;
-        } else {
-            submatches.push(...steps[submatch.step]
-                .match(graph, submatch.pathMatch, queryStats)
-                .map(p => ({pathMatch: p, step: submatch.step + 1})));
+        for (const submatch of submatches) {
+            if (submatch.step == steps.length) {
+                yield submatch.pathMatch.match;
+            } else {
+                submatchIters.push(iter(steps[submatch.step]
+                    .match(graph, submatch.pathMatch, queryStats))
+                    .map(p => ({pathMatch: p, step: submatch.step + 1})));
+            }
         }
     }
 }
