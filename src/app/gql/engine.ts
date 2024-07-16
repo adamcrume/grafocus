@@ -371,7 +371,7 @@ abstract class MatchInitializer implements QueryPlanStage {
     abstract stageName(): string;
     abstract stageChildren(): QueryPlanStage[];
     abstract stageData(): QueryPlanStageData;
-    abstract initial(match: Match, graph: Graph<Value>): PathMatch[];
+    abstract initial(match: Match, graph: Graph<Value>): IterableIterator<PathMatch>;
 }
 
 class ScanGraph extends MatchInitializer {
@@ -391,16 +391,14 @@ class ScanGraph extends MatchInitializer {
         return null;
     }
 
-    override initial(match: Match, graph: Graph<Value>): PathMatch[] {
-        let pathMatches: PathMatch[] = [];
+    override *initial(match: Match, graph: Graph<Value>): IterableIterator<PathMatch> {
         for (const startNode of graph.nodes) {
-            pathMatches.push({
+            yield {
                 match,
                 head: startNode,
                 traversedEdges: new Set(),
-            });
+            };
         }
-        return pathMatches;
     }
 }
 
@@ -421,7 +419,7 @@ class MoveHeadToVariable extends MatchInitializer {
         return quoteIdentifier(this.variableName);
     }
 
-    override initial(match: Match, graph: Graph<Value>): PathMatch[] {
+    override *initial(match: Match, graph: Graph<Value>): IterableIterator<PathMatch> {
         const value = match.get(this.variableName);
         if (value === undefined) {
             throw new Error(`Variable ${this.variableName} not defined`);
@@ -434,13 +432,13 @@ class MoveHeadToVariable extends MatchInitializer {
         if (node === undefined) {
             throw new Error(`Node ${nodeID} (from variable ${this.variableName}) not found`);
         }
-        return [{
+        yield {
             match,
             head: node,
             // This won't work once we use this class within the same graph pattern, i.e. multiple
             // paths within the same MATCH.
             traversedEdges: new Set(),
-        }];
+        };
     }
 }
 
@@ -461,18 +459,18 @@ class MoveHeadToID extends MatchInitializer {
         return quoteIdentifier(this.id);
     }
 
-    override initial(match: Match, graph: Graph<Value>): PathMatch[] {
+    override *initial(match: Match, graph: Graph<Value>): IterableIterator<PathMatch> {
         const node = graph.getNodeByID(this.id);
         if (node === undefined) {
             throw new Error(`Node ${this.id} not found`);
         }
-        return [{
+        yield {
             match,
             head: node,
             // This won't work once we use this class within the same graph pattern, i.e. multiple
             // paths within the same MATCH.
             traversedEdges: new Set(),
-        }];
+        };
     }
 }
 
