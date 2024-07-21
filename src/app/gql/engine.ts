@@ -105,14 +105,14 @@ function describeQueryPlanStage(stage: QueryPlanStage, indent: number): string {
 type Match = Scope<string, Value>;
 
 class Scope<K, V> {
-    vars: Map<K, V>;
+    private readonly vars: Immutable.Map<K, V>;
 
-    constructor(readonly parent?: Scope<K, V>, vars?: Map<K, V>) {
-        if (vars) {
-            this.vars = vars;
-        } else {
-            this.vars = new Map();
-        }
+    constructor(private readonly parent?: Scope<K, V>, vars?: Map<K, V>|Immutable.Map<K, V>) {
+        this.vars = Immutable.Map(vars);
+    }
+
+    ownVars(): Immutable.Map<K, V> {
+        return this.vars;
     }
 
     has(key: K): boolean {
@@ -123,34 +123,28 @@ class Scope<K, V> {
         return this.vars.get(key) ?? this.parent?.get(key);
     }
 
-    set(key: K, value: V): void {
-        this.vars.set(key, value);
+    set(key: K, value: V): Scope<K, V> {
+        return new Scope(this.parent, this.vars.set(key, value));
     }
 
-    // TODO: optimize
-    keys(): Set<K> {
-        const keys = new Set(this.vars.keys());
-        if (this.parent) {
-            for (const k of this.parent.keys()) {
-                keys.add(k);
-            }
-        }
-        return keys;
+    keys(): Immutable.Set<K> {
+        return (this.parent?.keys() ?? Immutable.Set())
+            .withMutations(keys => {
+                for (const k of this.vars.keys()) {
+                    keys.add(k);
+                }
+            });
     }
 
-    clone(): Scope<K, V> {
-        return new Scope(this.parent, new Map(this.vars));
-    }
-
-    toMap(): Map<K, V> {
+    toImmutableMap(): Immutable.Map<K, V> {
         if (!this.parent) {
-            return new Map(this.vars);
+            return this.vars;
         }
-        const map = this.parent.toMap();
-        for (const [k, v] of this.vars) {
-            map.set(k, v);
-        }
-        return map;
+        return this.parent.toImmutableMap().withMutations(map => {
+            for (const [k, v] of this.vars) {
+                map.set(k, v);
+            }
+        });
     }
 }
 
@@ -162,7 +156,7 @@ function joinMatches(left: Match[], right: Match[]): Match[] {
     }
     const m1 = left[0];
     const m2 = right[0];
-    const commonKeys = [...intersection(m1.keys(), m2.keys())];
+    const commonKeys = [...m1.keys().intersect(m2.keys())];
     commonKeys.sort();
     const joinKey = (match: Match) => JSON.stringify(commonKeys.map(k => serializeValue(match.get(k)!)));
     const leftByKey = new Map<string, Match[]>();
@@ -180,12 +174,9 @@ function joinMatches(left: Match[], right: Match[]): Match[] {
         const k = joinKey(m);
         let bucket = leftByKey.get(k);
         for (const leftMatch of bucket ?? []) {
-            const leftMap = leftMatch.toMap();
-            const rightMap = m.toMap();
-            for (const [kk, vv] of rightMap) {
-                leftMap.set(kk, vv);
-            }
-            result.push(new Scope(undefined, leftMap));
+            const leftMap = leftMatch.toImmutableMap();
+            const rightMap = m.toImmutableMap();
+            result.push(new Scope(undefined, leftMap.merge(rightMap)));
         }
     }
     return result;
@@ -529,17 +520,6 @@ function reversePath(path: Path): Path {
     };
 }
 
-// Can be replaced by Set.intersection once that's available.
-function intersection<T>(left: Set<T>, right: Set<T>): Set<T> {
-    const result = new Set<T>();
-    for (const k of left) {
-        if (right.has(k)) {
-            result.add(k);
-        }
-    }
-    return result;
-}
-
 function filterMatches(filter: FilterStage): Stagelet {
     return {
         ...filter,
@@ -694,8 +674,7 @@ class MatchNode extends MatchStep {
             } else if (!this.allowNewVariables) {
                 throw new Error(`Attempting to bind variable ${JSON.stringify(name)} in a position where it is not allowed`);
             } else {
-                match = match.clone();
-                match.set(name, nodeRefValue(pos.head.id));
+                match = match.set(name, nodeRefValue(pos.head.id));
             }
         }
         yield {
@@ -750,8 +729,7 @@ class MatchEdge extends MatchStep {
                     } else if (!this.allowNewVariables) {
                         throw new Error(`Attempting to bind variable ${JSON.stringify(name)} in a position where it is not allowed`);
                     } else {
-                        match = match.clone();
-                        match.set(name, edgeRefValue(edge.id));
+                        match = match.set(name, edgeRefValue(edge.id));
                     }
                 }
                 const subTraversed = new Set(pos.traversedEdges);
@@ -796,9 +774,9 @@ class MatchQuantified extends MatchStep {
         while (length < this.max && matches.length) {
             if (length >= this.min) {
                 for (const m of matches) {
-                    const match = pos.match.clone();
+                    let match = pos.match;
                     for (const [k, v] of m.variables) {
-                        match.set(k, listValue(v));
+                        match = match.set(k, listValue(v));
                     }
                     yield {
                         match,
@@ -817,7 +795,7 @@ class MatchQuantified extends MatchStep {
                 }, queryStats);
                 for (const m of innerMatches) {
                     const variables = new Map(p.variables);
-                    for (const [k, v] of m.match.vars) {
+                    for (const [k, v] of m.match.ownVars()) {
                         variables.set(k, [...variables.get(k) ?? [], v]);
                     }
                     newMatches.push({
