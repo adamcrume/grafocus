@@ -15,7 +15,13 @@
  */
 
 import { Component, Inject } from '@angular/core';
-import { MAT_DIALOG_DATA, MatDialogRef, MatDialogTitle, MatDialogContent, MatDialogActions } from '@angular/material/dialog';
+import {
+  MAT_DIALOG_DATA,
+  MatDialogRef,
+  MatDialogTitle,
+  MatDialogContent,
+  MatDialogActions,
+} from '@angular/material/dialog';
 
 import { ID_REGEX } from '../models';
 import { MatButton } from '@angular/material/button';
@@ -25,42 +31,52 @@ import { MatFormField, MatLabel } from '@angular/material/form-field';
 import { CdkScrollable } from '@angular/cdk/scrolling';
 
 export interface CreateNodeDialogInput {
-    id: string,
-    label?: string,
-    classes?: string,
+  id: string;
+  label?: string;
+  classes?: string;
 }
 
 export interface CreateNodeDialogOutput {
-    id: string,
-    label: string,
-    classes: string,
+  id: string;
+  label: string;
+  classes: string;
 }
 
 @Component({
-    selector: 'create-node-dialog',
-    templateUrl: './create-node-dialog.component.html',
-    styleUrls: ['./create-node-dialog.component.scss'],
-    standalone: true,
-    imports: [MatDialogTitle, CdkScrollable, MatDialogContent, MatFormField, MatLabel, MatInput, FormsModule, MatDialogActions, MatButton]
+  selector: 'create-node-dialog',
+  templateUrl: './create-node-dialog.component.html',
+  styleUrls: ['./create-node-dialog.component.scss'],
+  standalone: true,
+  imports: [
+    MatDialogTitle,
+    CdkScrollable,
+    MatDialogContent,
+    MatFormField,
+    MatLabel,
+    MatInput,
+    FormsModule,
+    MatDialogActions,
+    MatButton,
+  ],
 })
 export class CreateNodeDialogComponent {
-    readonly idPattern = ID_REGEX;
+  readonly idPattern = ID_REGEX;
 
-    constructor(
-        public dialogRef: MatDialogRef<CreateNodeDialogComponent>,
-        @Inject(MAT_DIALOG_DATA) public data: CreateNodeDialogInput,
-    ) {}
+  constructor(
+    public dialogRef: MatDialogRef<CreateNodeDialogComponent>,
+    @Inject(MAT_DIALOG_DATA) public data: CreateNodeDialogInput,
+  ) {}
 
-    onCancelClicked() {
-        this.dialogRef.close();
-    }
+  onCancelClicked() {
+    this.dialogRef.close();
+  }
 
-    onCreateClicked() {
-        const output: CreateNodeDialogOutput = {
-            ...this.data,
-            label: this.data.label ?? '',
-            classes: this.data.classes ?? '',
-        };
-        this.dialogRef.close(output);
-    }
+  onCreateClicked() {
+    const output: CreateNodeDialogOutput = {
+      ...this.data,
+      label: this.data.label ?? '',
+      classes: this.data.classes ?? '',
+    };
+    this.dialogRef.close(output);
+  }
 }

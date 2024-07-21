@@ -18,7 +18,11 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from '@angular/material/dialog';
+import {
+  MAT_DIALOG_DATA,
+  MatDialogModule,
+  MatDialogRef,
+} from '@angular/material/dialog';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 
 import { MessageDialogComponent } from './message-dialog.component';
@@ -29,20 +33,19 @@ describe('MessageDialogComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    imports: [
+      imports: [
         FormsModule,
         MatFormFieldModule,
         MatDialogModule,
         MatInputModule,
         NoopAnimationsModule,
         MessageDialogComponent,
-    ],
-    providers: [
+      ],
+      providers: [
         { provide: MatDialogRef, useValue: {} },
         { provide: MAT_DIALOG_DATA, useValue: [] },
-    ]
-})
-    .compileComponents();
+      ],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(MessageDialogComponent);
     component = fixture.componentInstance;

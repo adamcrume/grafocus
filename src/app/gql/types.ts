@@ -15,74 +15,74 @@
  */
 
 export interface TypeBase {
-    kind: string,
+  kind: string;
 }
 
 export interface AnyType extends TypeBase {
-    kind: 'any',
+  kind: 'any';
 }
 
 export const ANY: AnyType = {
-    kind: 'any',
+  kind: 'any',
 };
 
 export interface BooleanType extends TypeBase {
-    kind: 'boolean',
+  kind: 'boolean';
 }
 
-export const BOOLEAN: BooleanType = {kind: 'boolean'};
+export const BOOLEAN: BooleanType = { kind: 'boolean' };
 
 export interface StringType extends TypeBase {
-    kind: 'string',
+  kind: 'string';
 }
 
-export const STRING: StringType = {kind: 'string'};
+export const STRING: StringType = { kind: 'string' };
 
 export interface NumberType extends TypeBase {
-    kind: 'number',
+  kind: 'number';
 }
 
-export const NUMBER: NumberType = {kind: 'number'};
+export const NUMBER: NumberType = { kind: 'number' };
 
 export interface ListType extends TypeBase {
-    kind: 'list',
-    inner: Type,
+  kind: 'list';
+  inner: Type;
 }
 
 export const NUMBER_LIST: ListType = {
-    kind: 'list',
-    inner: NUMBER,
+  kind: 'list',
+  inner: NUMBER,
 };
 
 export const ANY_LIST: ListType = {
-    kind: 'list',
-    inner: ANY,
+  kind: 'list',
+  inner: ANY,
 };
 
 export interface NodeRefType extends TypeBase {
-    kind: 'node_ref',
+  kind: 'node_ref';
 }
 
-export const NODE_REF: NodeRefType = {kind: 'node_ref'};
+export const NODE_REF: NodeRefType = { kind: 'node_ref' };
 
 export interface EdgeRefType extends TypeBase {
-    kind: 'edge_ref',
+  kind: 'edge_ref';
 }
 
-export const EDGE_REF: EdgeRefType = {kind: 'edge_ref'};
+export const EDGE_REF: EdgeRefType = { kind: 'edge_ref' };
 
 export type Type =
-    AnyType |
-    BooleanType |
-    EdgeRefType |
-    ListType |
-    NodeRefType |
-    NumberType |
-    StringType;
+  | AnyType
+  | BooleanType
+  | EdgeRefType
+  | ListType
+  | NodeRefType
+  | NumberType
+  | StringType;
 
 export function typesEqual(a: Type, b: Type): boolean {
-    if (a.kind === 'list' && b.kind === 'list') {
-        return typesEqual(a.inner, b.inner);
-    }
-    return a.kind === b.kind;
+  if (a.kind === 'list' && b.kind === 'list') {
+    return typesEqual(a.inner, b.inner);
+  }
+  return a.kind === b.kind;
 }

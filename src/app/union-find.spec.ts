@@ -14,15 +14,29 @@
  * limitations under the License.
  */
 
-import {unionFind} from './union-find';
+import { unionFind } from './union-find';
 
 describe('unionFind', () => {
-    it('works', () => {
-        expect(unionFind([])).toEqual([]);
-        expect(unionFind([[]])).toEqual([]);
-        expect(unionFind([['a']])).toEqual([['a']]);
-        expect(unionFind([['a', 'b']])).toEqual([['a', 'b']]);
-        expect(unionFind([['a', 'b'], ['b', 'c']])).toEqual([['a', 'b', 'c']]);
-        expect(unionFind([['a', 'b'], ['b', 'c'], ['x', 'y']])).toEqual([['a', 'b', 'c'], ['x', 'y']]);
-    });
+  it('works', () => {
+    expect(unionFind([])).toEqual([]);
+    expect(unionFind([[]])).toEqual([]);
+    expect(unionFind([['a']])).toEqual([['a']]);
+    expect(unionFind([['a', 'b']])).toEqual([['a', 'b']]);
+    expect(
+      unionFind([
+        ['a', 'b'],
+        ['b', 'c'],
+      ]),
+    ).toEqual([['a', 'b', 'c']]);
+    expect(
+      unionFind([
+        ['a', 'b'],
+        ['b', 'c'],
+        ['x', 'y'],
+      ]),
+    ).toEqual([
+      ['a', 'b', 'c'],
+      ['x', 'y'],
+    ]);
+  });
 });

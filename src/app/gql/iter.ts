@@ -15,34 +15,34 @@
  */
 
 export class Iter<T> {
-    constructor(private readonly iterator: Iterator<T>) {}
+  constructor(private readonly iterator: Iterator<T>) {}
 
-    [Symbol.iterator](): this {
-        return this;
-    }
+  [Symbol.iterator](): this {
+    return this;
+  }
 
-    next(): IteratorResult<T> {
-        return this.iterator.next();
-    }
+  next(): IteratorResult<T> {
+    return this.iterator.next();
+  }
 
-    map<U>(f: (t: T) => U): Iter<U> {
-        const iterator = this.iterator;
-        return new Iter<U>({
-            next(): IteratorResult<U> {
-                const r = iterator.next();
-                if (r.done) {
-                    return r;
-                }
-                return {value: f(r.value)};
-            }
-        });
-    }
+  map<U>(f: (t: T) => U): Iter<U> {
+    const iterator = this.iterator;
+    return new Iter<U>({
+      next(): IteratorResult<U> {
+        const r = iterator.next();
+        if (r.done) {
+          return r;
+        }
+        return { value: f(r.value) };
+      },
+    });
+  }
 }
 
-export function iter<T>(iterator: Iterator<T>|Iterable<T>): Iter<T> {
-    if (Symbol.iterator in iterator) {
-        return new Iter<T>(iterator[Symbol.iterator]());
-    } else {
-        return new Iter<T>(iterator);
-    }
+export function iter<T>(iterator: Iterator<T> | Iterable<T>): Iter<T> {
+  if (Symbol.iterator in iterator) {
+    return new Iter<T>(iterator[Symbol.iterator]());
+  } else {
+    return new Iter<T>(iterator);
+  }
 }

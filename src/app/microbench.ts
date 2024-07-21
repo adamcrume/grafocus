@@ -15,49 +15,52 @@
  */
 
 class Test {
-    sum = 0;
-    sumSq = 0;
+  sum = 0;
+  sumSq = 0;
 
-    constructor(readonly name: string, readonly f: () => void) {}
+  constructor(
+    readonly name: string,
+    readonly f: () => void,
+  ) {}
 }
 
 export class Bencher {
-    private tests: Array<Test> = [];
-    private count = 0;
+  private tests: Array<Test> = [];
+  private count = 0;
 
-    add(name: string, f: () => void): void {
-        this.tests.push(new Test(name, f));
-    }
+  add(name: string, f: () => void): void {
+    this.tests.push(new Test(name, f));
+  }
 
-    private tick(): Promise<void> {
-        return new Promise(resolve => {
-            setTimeout(resolve, 0);
-        });
-    }
+  private tick(): Promise<void> {
+    return new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  }
 
-    async run(m: number): Promise<void> {
-        console.log('Warmup...');
-        for (let i = 0; i < 1; i++) {
-            for (const test of this.tests) {
-                test.f();
-            }
-        }
-        for (let i = 0; i < m; i++) {
-            console.log(`-------------------`);
-            console.log(`Iteration ${i} of ${m}`);
-            const n = ++this.count;
-            for (const test of this.tests) {
-                const start = performance.now();
-                test.f();
-                const end = performance.now();
-                test.sum += end - start;
-                test.sumSq += Math.pow(end - start, 2);
-                const avg = test.sum / n;
-                const variance = (test.sumSq / n - avg * avg) * n / (n - 1);
-                const moe = Math.sqrt(variance / n);
-                console.log(`${test.name}: ${avg} +/- ${moe}`);
-                await this.tick();
-            }
-        }
+  async run(m: number): Promise<void> {
+    console.log('Warmup...');
+    for (let i = 0; i < 1; i++) {
+      for (const test of this.tests) {
+        test.f();
+      }
     }
+    for (let i = 0; i < m; i++) {
+      console.log(`-------------------`);
+      console.log(`Iteration ${i} of ${m}`);
+      const n = ++this.count;
+      for (const test of this.tests) {
+        const start = performance.now();
+        test.f();
+        const end = performance.now();
+        test.sum += end - start;
+        test.sumSq += Math.pow(end - start, 2);
+        const avg = test.sum / n;
+        const variance = ((test.sumSq / n - avg * avg) * n) / (n - 1);
+        const moe = Math.sqrt(variance / n);
+        console.log(`${test.name}: ${avg} +/- ${moe}`);
+        await this.tick();
+      }
+    }
+  }
 }

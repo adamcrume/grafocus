@@ -23,41 +23,50 @@ import { MatInput } from '@angular/material/input';
 import { MatFormField, MatLabel } from '@angular/material/form-field';
 
 @Component({
-    selector: 'element-properties',
-    templateUrl: './element-properties.component.html',
-    styleUrls: ['./element-properties.component.scss'],
-    standalone: true,
-    imports: [MatFormField, MatLabel, MatInput, FormsModule]
+  selector: 'element-properties',
+  templateUrl: './element-properties.component.html',
+  styleUrls: ['./element-properties.component.scss'],
+  standalone: true,
+  imports: [MatFormField, MatLabel, MatInput, FormsModule],
 })
 export class ElementPropertiesComponent {
-    readonly classesPattern = CLASS_LIST_REGEX;
-    private _element?: cytoscape.SingularElementReturnValue = undefined;
-    @Input() set element(value: cytoscape.SingularElementReturnValue) {
-        this._element = value;
-        this.id = this._element.id();
-        this.label = this._element.data('label') ?? '';
-        const classes = this._element.classes();
-        if (typeof classes === 'string') {
-            this.classes = (classes as string).split(',').filter(c => c.startsWith('user_data_')).map(c => c.substring('user_data_'.length)).join(',');
-        } else if (classes instanceof Array) {
-            this.classes = classes.filter(c => c.startsWith('user_data_')).map(c => c.substring('user_data_'.length)).join(',');
-        } else if (typeof classes === 'undefined') {
-            this.classes = '';
-        } else {
-            throw new Error(`Unrecognized type of element.classes(): ${typeof classes}`);
-        }
-        this.description = this._element.data('description') ?? '';
+  readonly classesPattern = CLASS_LIST_REGEX;
+  private _element?: cytoscape.SingularElementReturnValue = undefined;
+  @Input() set element(value: cytoscape.SingularElementReturnValue) {
+    this._element = value;
+    this.id = this._element.id();
+    this.label = this._element.data('label') ?? '';
+    const classes = this._element.classes();
+    if (typeof classes === 'string') {
+      this.classes = (classes as string)
+        .split(',')
+        .filter((c) => c.startsWith('user_data_'))
+        .map((c) => c.substring('user_data_'.length))
+        .join(',');
+    } else if (classes instanceof Array) {
+      this.classes = classes
+        .filter((c) => c.startsWith('user_data_'))
+        .map((c) => c.substring('user_data_'.length))
+        .join(',');
+    } else if (typeof classes === 'undefined') {
+      this.classes = '';
+    } else {
+      throw new Error(
+        `Unrecognized type of element.classes(): ${typeof classes}`,
+      );
     }
-    @Input() editMode = false;
-    @Output() classesChange = new EventEmitter<string[]>();
-    @Output() labelChange = new EventEmitter<string>();
-    @Output() descriptionChange = new EventEmitter<string>();
-    id = '';
-    classes = '';
-    label = '';
-    description = '';
+    this.description = this._element.data('description') ?? '';
+  }
+  @Input() editMode = false;
+  @Output() classesChange = new EventEmitter<string[]>();
+  @Output() labelChange = new EventEmitter<string>();
+  @Output() descriptionChange = new EventEmitter<string>();
+  id = '';
+  classes = '';
+  label = '';
+  description = '';
 
-    onClassesChanged() {
-        this.classesChange.emit(parseClasses(this.classes));
-    }
+  onClassesChanged() {
+    this.classesChange.emit(parseClasses(this.classes));
+  }
 }

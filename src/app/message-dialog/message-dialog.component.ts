@@ -15,29 +15,41 @@
  */
 
 import { Component, Inject } from '@angular/core';
-import { MAT_DIALOG_DATA, MatDialogRef, MatDialogTitle, MatDialogContent, MatDialogActions } from '@angular/material/dialog';
+import {
+  MAT_DIALOG_DATA,
+  MatDialogRef,
+  MatDialogTitle,
+  MatDialogContent,
+  MatDialogActions,
+} from '@angular/material/dialog';
 import { MatButton } from '@angular/material/button';
 import { CdkScrollable } from '@angular/cdk/scrolling';
 
 export interface MessageDialogInput {
-    title: string,
-    message: string,
+  title: string;
+  message: string;
 }
 
 @Component({
-    selector: 'message-dialog',
-    templateUrl: './message-dialog.component.html',
-    styleUrls: ['./message-dialog.component.scss'],
-    standalone: true,
-    imports: [MatDialogTitle, CdkScrollable, MatDialogContent, MatDialogActions, MatButton]
+  selector: 'message-dialog',
+  templateUrl: './message-dialog.component.html',
+  styleUrls: ['./message-dialog.component.scss'],
+  standalone: true,
+  imports: [
+    MatDialogTitle,
+    CdkScrollable,
+    MatDialogContent,
+    MatDialogActions,
+    MatButton,
+  ],
 })
 export class MessageDialogComponent {
-    constructor(
-        public dialogRef: MatDialogRef<MessageDialogComponent>,
-        @Inject(MAT_DIALOG_DATA) public data: MessageDialogInput,
-    ) {}
+  constructor(
+    public dialogRef: MatDialogRef<MessageDialogComponent>,
+    @Inject(MAT_DIALOG_DATA) public data: MessageDialogInput,
+  ) {}
 
-    onDismissClicked() {
-        this.dialogRef.close();
-    }
+  onDismissClicked() {
+    this.dialogRef.close();
+  }
 }

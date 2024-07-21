@@ -24,9 +24,8 @@ describe('MultiElementPropertiesComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    imports: [MultiElementPropertiesComponent]
-})
-    .compileComponents();
+      imports: [MultiElementPropertiesComponent],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(MultiElementPropertiesComponent);
     component = fixture.componentInstance;

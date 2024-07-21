@@ -18,29 +18,29 @@ import cytoscape from 'cytoscape';
 import { AppComponent } from './app.component';
 
 export class CytoscapeHarness {
-    constructor(private app: AppComponent) {}
+  constructor(private app: AppComponent) {}
 
-    private get cy(): cytoscape.Core {
-        const cy = this.app.cyForTest;
-        if (!cy) {
-            throw new Error('cytoscape not initialized');
-        }
-        return cy;
+  private get cy(): cytoscape.Core {
+    const cy = this.app.cyForTest;
+    if (!cy) {
+      throw new Error('cytoscape not initialized');
     }
+    return cy;
+  }
 
-    getNode(id: string): NodeHarness {
-        const collection = this.cy.$id(id);
-        if (collection.length === 0) {
-            throw new Error(`Node ${id} not found`);
-        }
-        return new NodeHarness(collection);
+  getNode(id: string): NodeHarness {
+    const collection = this.cy.$id(id);
+    if (collection.length === 0) {
+      throw new Error(`Node ${id} not found`);
     }
+    return new NodeHarness(collection);
+  }
 }
 
 export class NodeHarness {
-    constructor(private node: cytoscape.CollectionReturnValue) {}
+  constructor(private node: cytoscape.CollectionReturnValue) {}
 
-    rightClick(): void {
-        this.node.emit('cxttap');
-    }
+  rightClick(): void {
+    this.node.emit('cxttap');
+  }
 }

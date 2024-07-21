@@ -15,7 +15,7 @@
  */
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { MatDialogModule, MatDialogRef} from '@angular/material/dialog';
+import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 
 import { HelpDialogComponent } from './help-dialog.component';
@@ -26,16 +26,9 @@ describe('HelpDialogComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    imports: [
-        MatDialogModule,
-        NoopAnimationsModule,
-        HelpDialogComponent,
-    ],
-    providers: [
-        { provide: MatDialogRef, useValue: {} },
-    ]
-})
-    .compileComponents();
+      imports: [MatDialogModule, NoopAnimationsModule, HelpDialogComponent],
+      providers: [{ provide: MatDialogRef, useValue: {} }],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(HelpDialogComponent);
     component = fixture.componentInstance;

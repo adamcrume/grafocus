@@ -15,7 +15,13 @@
  */
 
 import { Component, Inject } from '@angular/core';
-import { MAT_DIALOG_DATA, MatDialogRef, MatDialogTitle, MatDialogContent, MatDialogActions } from '@angular/material/dialog';
+import {
+  MAT_DIALOG_DATA,
+  MatDialogRef,
+  MatDialogTitle,
+  MatDialogContent,
+  MatDialogActions,
+} from '@angular/material/dialog';
 
 import { ID_REGEX } from '../models';
 import { MatButton } from '@angular/material/button';
@@ -25,44 +31,54 @@ import { MatFormField, MatLabel } from '@angular/material/form-field';
 import { CdkScrollable } from '@angular/cdk/scrolling';
 
 export interface CreateEdgeDialogInput {
-    id: string,
-    sourceID: string,
-    targetID: string,
-    label?: string,
-    classes?: string,
+  id: string;
+  sourceID: string;
+  targetID: string;
+  label?: string;
+  classes?: string;
 }
 
 export interface CreateEdgeDialogOutput {
-    id: string,
-    label: string,
-    classes: string,
+  id: string;
+  label: string;
+  classes: string;
 }
 
 @Component({
-    selector: 'create-edge-dialog',
-    templateUrl: './create-edge-dialog.component.html',
-    styleUrls: ['./create-edge-dialog.component.scss'],
-    standalone: true,
-    imports: [MatDialogTitle, CdkScrollable, MatDialogContent, MatFormField, MatLabel, MatInput, FormsModule, MatDialogActions, MatButton]
+  selector: 'create-edge-dialog',
+  templateUrl: './create-edge-dialog.component.html',
+  styleUrls: ['./create-edge-dialog.component.scss'],
+  standalone: true,
+  imports: [
+    MatDialogTitle,
+    CdkScrollable,
+    MatDialogContent,
+    MatFormField,
+    MatLabel,
+    MatInput,
+    FormsModule,
+    MatDialogActions,
+    MatButton,
+  ],
 })
 export class CreateEdgeDialogComponent {
-    readonly idPattern = ID_REGEX;
+  readonly idPattern = ID_REGEX;
 
-    constructor(
-        public dialogRef: MatDialogRef<CreateEdgeDialogComponent>,
-        @Inject(MAT_DIALOG_DATA) public data: CreateEdgeDialogInput,
-    ) {}
+  constructor(
+    public dialogRef: MatDialogRef<CreateEdgeDialogComponent>,
+    @Inject(MAT_DIALOG_DATA) public data: CreateEdgeDialogInput,
+  ) {}
 
-    onCancelClicked() {
-        this.dialogRef.close();
-    }
+  onCancelClicked() {
+    this.dialogRef.close();
+  }
 
-    onCreateClicked() {
-        const output: CreateEdgeDialogOutput = {
-            ...this.data,
-            label: this.data.label ?? '',
-            classes: this.data.classes ?? '',
-        };
-        this.dialogRef.close(output);
-    }
+  onCreateClicked() {
+    const output: CreateEdgeDialogOutput = {
+      ...this.data,
+      label: this.data.label ?? '',
+      classes: this.data.classes ?? '',
+    };
+    this.dialogRef.close(output);
+  }
 }

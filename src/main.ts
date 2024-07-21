@@ -16,7 +16,6 @@
 
 import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
 
-
 import { importProvidersFrom } from '@angular/core';
 import { AppComponent } from './app/app.component';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -35,11 +34,24 @@ import { DragDropModule } from '@angular/cdk/drag-drop';
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { BrowserModule, bootstrapApplication } from '@angular/platform-browser';
 
-
 bootstrapApplication(AppComponent, {
-    providers: [
-        importProvidersFrom(BrowserModule, DragDropModule, FormsModule, MatButtonModule, MatChipsModule, MatDialogModule, MatExpansionModule, MatIconModule, MatInputModule, MatSelectModule, MatSidenavModule, MatSlideToggleModule, MatToolbarModule, MatTooltipModule),
-        provideAnimations()
-    ]
-})
-  .catch(err => console.error(err));
+  providers: [
+    importProvidersFrom(
+      BrowserModule,
+      DragDropModule,
+      FormsModule,
+      MatButtonModule,
+      MatChipsModule,
+      MatDialogModule,
+      MatExpansionModule,
+      MatIconModule,
+      MatInputModule,
+      MatSelectModule,
+      MatSidenavModule,
+      MatSlideToggleModule,
+      MatToolbarModule,
+      MatTooltipModule,
+    ),
+    provideAnimations(),
+  ],
+}).catch((err) => console.error(err));

@@ -14,21 +14,25 @@
  * limitations under the License.
  */
 
-import {planQuery, QueryPlan} from './gql/engine';
-import {parseQuery} from './gql/parser';
+import { planQuery, QueryPlan } from './gql/engine';
+import { parseQuery } from './gql/parser';
 
 export interface Transformation {
-    name: string,
-    query: string,
-    queryPlan: QueryPlan,
-    enabled: boolean,
+  name: string;
+  query: string;
+  queryPlan: QueryPlan;
+  enabled: boolean;
 }
 
-export function createTransformation(name: string, query: string, enabled: boolean = false): Transformation {
-    return {
-        name,
-        query,
-        queryPlan: planQuery(parseQuery(query)),
-        enabled,
-    };
+export function createTransformation(
+  name: string,
+  query: string,
+  enabled: boolean = false,
+): Transformation {
+  return {
+    name,
+    query,
+    queryPlan: planQuery(parseQuery(query)),
+    enabled,
+  };
 }

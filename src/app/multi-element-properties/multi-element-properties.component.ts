@@ -28,77 +28,77 @@ function intersection<T>(left: Set<T>, right: Set<T>): Set<T> {
   const result = new Set<T>();
   for (const value of left) {
     if (right.has(value)) {
-        result.add(value);
+      result.add(value);
     }
   }
   return result;
 }
 
 function difference<T>(left: Set<T>, right: Set<T>): Set<T> {
-    const result = new Set<T>(left);
-    for (const value of right) {
-        result.delete(value);
-    }
-    return result;
+  const result = new Set<T>(left);
+  for (const value of right) {
+    result.delete(value);
+  }
+  return result;
 }
 
 interface Classes {
-    common: string[],
-    disjoint: string[],
+  common: string[];
+  disjoint: string[];
 }
 
 @Component({
-    selector: 'multi-element-properties',
-    templateUrl: './multi-element-properties.component.html',
-    styleUrls: ['./multi-element-properties.component.scss'],
-    standalone: true,
-    imports: [MatFormField, MatLabel, MatInput, FormsModule, MatButton]
+  selector: 'multi-element-properties',
+  templateUrl: './multi-element-properties.component.html',
+  styleUrls: ['./multi-element-properties.component.scss'],
+  standalone: true,
+  imports: [MatFormField, MatLabel, MatInput, FormsModule, MatButton],
 })
 export class MultiElementPropertiesComponent {
-    readonly classesPattern = CLASS_LIST_REGEX;
-    private oldSelection: cytoscape.Collection|undefined = undefined;
-    @Input() selection?: cytoscape.Collection = undefined;
-    @Input() editMode = false;
-    @Output() classesAdded = new EventEmitter<string[]>();
-    @Output() classesRemoved = new EventEmitter<string[]>();
-    classesInput = '';
+  readonly classesPattern = CLASS_LIST_REGEX;
+  private oldSelection: cytoscape.Collection | undefined = undefined;
+  @Input() selection?: cytoscape.Collection = undefined;
+  @Input() editMode = false;
+  @Output() classesAdded = new EventEmitter<string[]>();
+  @Output() classesRemoved = new EventEmitter<string[]>();
+  classesInput = '';
 
-    private _classes: Classes = {
-        common: [],
-        disjoint: [],
-    };
-    get classes(): Classes {
-        if (this.selection !== this.oldSelection) {
-            this._classes = (() => {
-                const selection = this.selection;
-                if (!selection || selection.empty()) {
-                    return {
-                        common: [],
-                        disjoint: [],
-                    };
-                }
-                let common = new Set<string>(selection[0].classes());
-                let union = new Set<string>(selection[0].classes());
-                for (const element of selection) {
-                    common = intersection(common, new Set<string>(element.classes()));
-                    for (const cls of element.classes()) {
-                        union.add(cls);
-                    }
-                }
-                return {
-                    common: [...common],
-                    disjoint: [...difference(union, common)],
-                };
-            })();
+  private _classes: Classes = {
+    common: [],
+    disjoint: [],
+  };
+  get classes(): Classes {
+    if (this.selection !== this.oldSelection) {
+      this._classes = (() => {
+        const selection = this.selection;
+        if (!selection || selection.empty()) {
+          return {
+            common: [],
+            disjoint: [],
+          };
         }
-        return this._classes;
+        let common = new Set<string>(selection[0].classes());
+        let union = new Set<string>(selection[0].classes());
+        for (const element of selection) {
+          common = intersection(common, new Set<string>(element.classes()));
+          for (const cls of element.classes()) {
+            union.add(cls);
+          }
+        }
+        return {
+          common: [...common],
+          disjoint: [...difference(union, common)],
+        };
+      })();
     }
+    return this._classes;
+  }
 
-    removeClasses() {
-        this.classesRemoved.emit(parseClasses(this.classesInput));
-    }
+  removeClasses() {
+    this.classesRemoved.emit(parseClasses(this.classesInput));
+  }
 
-    addClasses() {
-        this.classesAdded.emit(parseClasses(this.classesInput));
-    }
+  addClasses() {
+    this.classesAdded.emit(parseClasses(this.classesInput));
+  }
 }

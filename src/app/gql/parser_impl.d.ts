@@ -14,4 +14,4 @@
  * limitations under the License.
  */
 
-export function parse(input: string, options?: {startRule: string}): any;
+export function parse(input: string, options?: { startRule: string }): any;

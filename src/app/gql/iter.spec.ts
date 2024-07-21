@@ -14,18 +14,20 @@
  * limitations under the License.
  */
 
-import {iter} from './iter';
+import { iter } from './iter';
 
-describe("iter", () => {
-    it("works", () => {
-        function* createIter(): Iterator<number> {
-            for (let i = 0; i < 5; i++) {
-                yield i;
-            }
-        }
+describe('iter', () => {
+  it('works', () => {
+    function* createIter(): Iterator<number> {
+      for (let i = 0; i < 5; i++) {
+        yield i;
+      }
+    }
 
-        expect([...iter(createIter())]).toEqual([0, 1, 2, 3, 4]);
-        expect([...iter(createIter()).map(x => 2 * x)]).toEqual([0, 2, 4, 6, 8]);
-        expect([...iter([0, 1, 2, 3, 4]).map(x => 2 * x)]).toEqual([0, 2, 4, 6, 8]);
-    });
+    expect([...iter(createIter())]).toEqual([0, 1, 2, 3, 4]);
+    expect([...iter(createIter()).map((x) => 2 * x)]).toEqual([0, 2, 4, 6, 8]);
+    expect([...iter([0, 1, 2, 3, 4]).map((x) => 2 * x)]).toEqual([
+      0, 2, 4, 6, 8,
+    ]);
+  });
 });

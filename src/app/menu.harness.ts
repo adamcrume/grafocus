@@ -17,17 +17,17 @@
 import { ComponentHarness } from '@angular/cdk/testing';
 
 export class MenuHarness extends ComponentHarness {
-    static hostSelector = '.cy-context-menus-cxt-menu';
+  static hostSelector = '.cy-context-menus-cxt-menu';
 
-    async isVisible(): Promise<boolean> {
-        const host = await this.host();
-        const display = await host.getCssValue('display');
-        return display !== 'none';
-    }
+  async isVisible(): Promise<boolean> {
+    const host = await this.host();
+    const display = await host.getCssValue('display');
+    return display !== 'none';
+  }
 
-    async isItemVisible(id: string): Promise<boolean> {
-        const item = await (this.locatorFor('#' + id))();
-        const display = await item.getCssValue('display');
-        return display !== 'none';
-    }
+  async isItemVisible(id: string): Promise<boolean> {
+    const item = await this.locatorFor('#' + id)();
+    const display = await item.getCssValue('display');
+    return display !== 'none';
+  }
 }

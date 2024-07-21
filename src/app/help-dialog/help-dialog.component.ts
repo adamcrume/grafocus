@@ -15,23 +15,32 @@
  */
 
 import { Component, Inject } from '@angular/core';
-import { MatDialogRef, MatDialogTitle, MatDialogContent, MatDialogActions } from '@angular/material/dialog';
+import {
+  MatDialogRef,
+  MatDialogTitle,
+  MatDialogContent,
+  MatDialogActions,
+} from '@angular/material/dialog';
 import { MatButton } from '@angular/material/button';
 import { CdkScrollable } from '@angular/cdk/scrolling';
 
 @Component({
-    selector: 'help-dialog',
-    templateUrl: './help-dialog.component.html',
-    styleUrls: ['./help-dialog.component.scss'],
-    standalone: true,
-    imports: [MatDialogTitle, CdkScrollable, MatDialogContent, MatDialogActions, MatButton]
+  selector: 'help-dialog',
+  templateUrl: './help-dialog.component.html',
+  styleUrls: ['./help-dialog.component.scss'],
+  standalone: true,
+  imports: [
+    MatDialogTitle,
+    CdkScrollable,
+    MatDialogContent,
+    MatDialogActions,
+    MatButton,
+  ],
 })
 export class HelpDialogComponent {
-    constructor(
-        public dialogRef: MatDialogRef<HelpDialogComponent>,
-    ) {}
+  constructor(public dialogRef: MatDialogRef<HelpDialogComponent>) {}
 
-    onDismissClicked() {
-        this.dialogRef.close();
-    }
+  onDismissClicked() {
+    this.dialogRef.close();
+  }
 }

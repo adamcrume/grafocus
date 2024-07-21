@@ -37,14 +37,14 @@ import { TransformationListComponent } from './transformation-list/transformatio
 let originalRequestAnimationFrame: (callback: FrameRequestCallback) => number;
 
 describe('AppComponent', () => {
-    beforeEach(async () => {
-        originalRequestAnimationFrame = window.requestAnimationFrame;
-        window.requestAnimationFrame = (callback) => {
-            return 0;
-        };
+  beforeEach(async () => {
+    originalRequestAnimationFrame = window.requestAnimationFrame;
+    window.requestAnimationFrame = (callback) => {
+      return 0;
+    };
 
     await TestBed.configureTestingModule({
-    imports: [
+      imports: [
         FormsModule,
         MatButtonModule,
         MatChipsModule,
@@ -60,15 +60,15 @@ describe('AppComponent', () => {
         NoopAnimationsModule,
         TransformationListComponent,
         AppComponent,
-    ],
-}).compileComponents();
-    });
+      ],
+    }).compileComponents();
+  });
 
-    afterEach(() => {
-        window.requestAnimationFrame = originalRequestAnimationFrame;
-    });
+  afterEach(() => {
+    window.requestAnimationFrame = originalRequestAnimationFrame;
+  });
 
-    // Note that cytoscape doesn't work inside fakeAsync.
+  // Note that cytoscape doesn't work inside fakeAsync.
   it('should create the app', async () => {
     const fixture = TestBed.createComponent(AppComponent);
     const app = fixture.componentInstance;
@@ -76,30 +76,32 @@ describe('AppComponent', () => {
     fixture.detectChanges();
   });
 
-    it('can collapse nodes', async () => {
-        const fixture = TestBed.createComponent(AppComponent);
-        fixture.detectChanges();
-        const app = fixture.componentInstance;
-        expect(() => {
-            app.collapse('#website_network');
-        }).not.toThrow();
-    });
+  it('can collapse nodes', async () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+    const app = fixture.componentInstance;
+    expect(() => {
+      app.collapse('#website_network');
+    }).not.toThrow();
+  });
 
-    it('menu respects edit mode', async () => {
-        const fixture = TestBed.createComponent(AppComponent);
-        const harness =
-            await TestbedHarnessEnvironment.harnessForFixture(fixture, AppComponentHarness);
-        const cy = new CytoscapeHarness(fixture.componentInstance);
-        const menu = await harness.getMenu();
+  it('menu respects edit mode', async () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    const harness = await TestbedHarnessEnvironment.harnessForFixture(
+      fixture,
+      AppComponentHarness,
+    );
+    const cy = new CytoscapeHarness(fixture.componentInstance);
+    const menu = await harness.getMenu();
 
-        cy.getNode('client_1').rightClick();
-        expect(await menu.isVisible()).toBeTrue();
-        expect(await menu.isItemVisible('add-edge')).toBeFalse();
-        await harness.toggleSideNav();
-        await harness.toggleGraphDefinition();
-        await harness.setEditMode(true);
-        cy.getNode('client_1').rightClick();
-        expect(await menu.isVisible()).toBeTrue();
-        expect(await menu.isItemVisible('add-edge')).toBeTrue();
-    });
+    cy.getNode('client_1').rightClick();
+    expect(await menu.isVisible()).toBeTrue();
+    expect(await menu.isItemVisible('add-edge')).toBeFalse();
+    await harness.toggleSideNav();
+    await harness.toggleGraphDefinition();
+    await harness.setEditMode(true);
+    cy.getNode('client_1').rightClick();
+    expect(await menu.isVisible()).toBeTrue();
+    expect(await menu.isItemVisible('add-edge')).toBeTrue();
+  });
 });

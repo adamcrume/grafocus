@@ -20,32 +20,36 @@ import { MatSlideToggleHarness } from '@angular/material/slide-toggle/testing';
 import { MenuHarness } from './menu.harness';
 
 export class AppComponentHarness extends ComponentHarness {
-    static hostSelector = 'app-root';
+  static hostSelector = 'app-root';
 
-    getMenu = this.locatorFor(MenuHarness);
+  getMenu = this.locatorFor(MenuHarness);
 
-    getSidePanelMenuButton = this.locatorFor('.sidenav-toggle');
+  getSidePanelMenuButton = this.locatorFor('.sidenav-toggle');
 
-    getGraphDefinitionHeader = this.locatorFor('.graph-definition mat-expansion-panel-header');
+  getGraphDefinitionHeader = this.locatorFor(
+    '.graph-definition mat-expansion-panel-header',
+  );
 
-    getEditModeToggle = this.locatorFor(MatSlideToggleHarness.with({selector: '.edit-mode'}));
+  getEditModeToggle = this.locatorFor(
+    MatSlideToggleHarness.with({ selector: '.edit-mode' }),
+  );
 
-    async toggleSideNav(): Promise<void> {
-        const button = await this.getSidePanelMenuButton();
-        await button.click();
+  async toggleSideNav(): Promise<void> {
+    const button = await this.getSidePanelMenuButton();
+    await button.click();
+  }
+
+  async toggleGraphDefinition(): Promise<void> {
+    const header = await this.getGraphDefinitionHeader();
+    await header.click();
+  }
+
+  async setEditMode(value: boolean): Promise<void> {
+    const button = await this.getEditModeToggle();
+    if (value) {
+      await button.check();
+    } else {
+      await button.uncheck();
     }
-
-    async toggleGraphDefinition(): Promise<void> {
-        const header = await this.getGraphDefinitionHeader();
-        await header.click();
-    }
-
-    async setEditMode(value: boolean): Promise<void> {
-        const button = await this.getEditModeToggle();
-        if (value) {
-            await button.check();
-        } else {
-            await button.uncheck();
-        }
-    }
+  }
 }

@@ -14,30 +14,38 @@
  * limitations under the License.
  */
 
-import {Graph} from './graph';
+import { Graph } from './graph';
 
 describe('Graph.removeNode', () => {
-    it('works', () => {
-        const graph = Graph.new().withMutations(m => {
-            m.createNode('n1')
-                .createNode('n2')
-                .createNode('n3')
-                .createEdge('e1', 'n1', 'n2')
-                .createEdge('e2', 'n2', 'n3')
-                .createEdge('e3', 'n3', 'n1')
-                .removeNode('n1')
-        });
-        expect([...graph.nodes].map(n => n.id).sort()).toEqual(['n2', 'n3']);
-        expect([...graph.edges].map(e => e.id).sort()).toEqual(['e2']);
-        expect(new Set(graph.getNodeByID('n2')?.incomingEdgeIDs)).toEqual(new Set([]));
-        expect(new Set(graph.getNodeByID('n2')?.outgoingEdgeIDs)).toEqual(new Set(['e2']));
-        expect(new Set(graph.getNodeByID('n3')?.incomingEdgeIDs)).toEqual(new Set(['e2']));
-        expect(new Set(graph.getNodeByID('n3')?.outgoingEdgeIDs)).toEqual(new Set([]));
-        expect(graph.getNodeByID('n1')).toBeUndefined();
-        expect(graph.getNodeByID('n2')?.id).toEqual('n2');
-        expect(graph.getNodeByID('n3')?.id).toEqual('n3');
-        expect(graph.getEdgeByID('e1')).toBeUndefined();
-        expect(graph.getEdgeByID('e2')?.id).toEqual('e2');
-        expect(graph.getEdgeByID('e3')).toBeUndefined();
+  it('works', () => {
+    const graph = Graph.new().withMutations((m) => {
+      m.createNode('n1')
+        .createNode('n2')
+        .createNode('n3')
+        .createEdge('e1', 'n1', 'n2')
+        .createEdge('e2', 'n2', 'n3')
+        .createEdge('e3', 'n3', 'n1')
+        .removeNode('n1');
     });
+    expect([...graph.nodes].map((n) => n.id).sort()).toEqual(['n2', 'n3']);
+    expect([...graph.edges].map((e) => e.id).sort()).toEqual(['e2']);
+    expect(new Set(graph.getNodeByID('n2')?.incomingEdgeIDs)).toEqual(
+      new Set([]),
+    );
+    expect(new Set(graph.getNodeByID('n2')?.outgoingEdgeIDs)).toEqual(
+      new Set(['e2']),
+    );
+    expect(new Set(graph.getNodeByID('n3')?.incomingEdgeIDs)).toEqual(
+      new Set(['e2']),
+    );
+    expect(new Set(graph.getNodeByID('n3')?.outgoingEdgeIDs)).toEqual(
+      new Set([]),
+    );
+    expect(graph.getNodeByID('n1')).toBeUndefined();
+    expect(graph.getNodeByID('n2')?.id).toEqual('n2');
+    expect(graph.getNodeByID('n3')?.id).toEqual('n3');
+    expect(graph.getEdgeByID('e1')).toBeUndefined();
+    expect(graph.getEdgeByID('e2')?.id).toEqual('e2');
+    expect(graph.getEdgeByID('e3')).toBeUndefined();
+  });
 });

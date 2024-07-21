@@ -15,5 +15,8 @@
  */
 
 export function parseClasses(classes: string): string[] {
-    return classes.split(',').map(c => c.trim()).filter(c => c !== '');
+  return classes
+    .split(',')
+    .map((c) => c.trim())
+    .filter((c) => c !== '');
 }

@@ -29,16 +29,15 @@ describe('TransformationListComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    imports: [
+      imports: [
         FormsModule,
         MatChipsModule,
         MatIconModule,
         MatInputModule,
         NoopAnimationsModule,
         TransformationListComponent,
-    ]
-})
-    .compileComponents();
+      ],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(TransformationListComponent);
     component = fixture.componentInstance;

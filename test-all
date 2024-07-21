@@ -31,3 +31,4 @@ if ! diff -u3 "$output" <(npx peggy --allowed-start-rules start,node,edge,identi
 fi
 
 npm run ng test -- --watch=false
+npm run prettier-check
