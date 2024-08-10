@@ -17,8 +17,17 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 
 import { CLASS_LIST_REGEX, ElementDefinition } from '../models';
-import { parseClasses } from '../util';
+import { COMMA, ENTER } from '@angular/cdk/keycodes';
 import { FormsModule } from '@angular/forms';
+import {
+  MatChip,
+  MatChipsModule,
+  MatChipSet,
+  MatChipRemove,
+  MatChipEditedEvent,
+  MatChipInputEvent,
+} from '@angular/material/chips';
+import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import { MatFormField, MatLabel } from '@angular/material/form-field';
 
@@ -27,9 +36,20 @@ import { MatFormField, MatLabel } from '@angular/material/form-field';
   templateUrl: './element-properties.component.html',
   styleUrls: ['./element-properties.component.scss'],
   standalone: true,
-  imports: [MatFormField, MatLabel, MatInput, FormsModule],
+  imports: [
+    MatChip,
+    MatChipsModule,
+    MatChipSet,
+    MatChipRemove,
+    MatFormField,
+    MatIcon,
+    MatLabel,
+    MatInput,
+    FormsModule,
+  ],
 })
 export class ElementPropertiesComponent {
+  readonly separatorKeysCodes = [ENTER, COMMA] as const;
   readonly classesPattern = CLASS_LIST_REGEX;
   @Input() set element(value: ElementDefinition) {
     this.id = value.data.id;
@@ -46,8 +66,28 @@ export class ElementPropertiesComponent {
   label = '';
   description = '';
 
-  onClassesChanged(classes: string) {
-    this.classes = parseClasses(classes);
+  removeClass(cls: string) {
+    this.classes = this.classes.filter((c) => c !== cls);
+    this.classesChange.emit(this.classes);
+  }
+
+  editClass(cls: string, e: MatChipEditedEvent) {
+    const newCls = e.value.trim();
+    if (newCls && !this.classes.includes(newCls)) {
+      this.classes = this.classes.map((c) => (c === cls ? e.value : c));
+    } else {
+      this.classes = this.classes.filter((c) => c !== cls);
+    }
+    this.classesChange.emit(this.classes);
+  }
+
+  addClass(e: MatChipInputEvent) {
+    const cls = e.value.trim();
+    e.chipInput!.clear();
+    if (!cls || this.classes.includes(cls)) {
+      return;
+    }
+    this.classes.push(cls);
     this.classesChange.emit(this.classes);
   }
 }

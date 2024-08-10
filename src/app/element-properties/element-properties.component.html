@@ -34,14 +34,33 @@
 @if (editMode) {
   <mat-form-field>
     <mat-label>Classes</mat-label>
-    <input
-      type="text"
-      matInput
-      [pattern]="classesPattern"
-      [ngModel]="classes.join(',')"
-      #classesModel="ngModel"
-      (ngModelChange)="classesModel.valid?onClassesChanged($event):undefined">
+    <mat-chip-grid #chipGrid>
+      @for (cls of classes; track cls) {
+      <mat-chip-row
+        (removed)="removeClass(cls)"
+        [editable]="true"
+        (edited)="editClass(cls, $event)">
+        {{cls}}
+        <button matChipRemove>
+          <mat-icon>cancel</mat-icon>
+        </button>
+      </mat-chip-row>
+      }
+      <input
+        placeholder="Add class..."
+        [matChipInputFor]="chipGrid"
+        [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+        [matChipInputAddOnBlur]="true"
+        (matChipInputTokenEnd)="addClass($event)"
+        />
+    </mat-chip-grid>
   </mat-form-field>
+} @else {
+  <mat-chip-set>
+    @for (cls of classes; track cls) {
+    <mat-chip>{{cls}}</mat-chip>
+    }
+  </mat-chip-set>
 }
 
 @if (editMode) {
