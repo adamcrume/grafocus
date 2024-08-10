@@ -38,9 +38,9 @@
       type="text"
       matInput
       [pattern]="classesPattern"
-      [(ngModel)]="classes"
+      [ngModel]="classes.join(',')"
       #classesModel="ngModel"
-      (ngModelChange)="classesModel.valid?onClassesChanged():undefined">
+      (ngModelChange)="classesModel.valid?onClassesChanged($event):undefined">
   </mat-form-field>
 }
 

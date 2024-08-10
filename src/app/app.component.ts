@@ -344,6 +344,35 @@ function updateMenuVisibility(
   }
 }
 
+function toDefinition(e: cytoscape.SingularElementArgument): ElementDefinition {
+  const cyClasses = e.classes();
+  let classes: string[];
+  if (typeof cyClasses === 'string') {
+    classes = (cyClasses as string)
+      .split(',')
+      .filter((c) => c.startsWith('user_data_'))
+      .map((c) => c.substring('user_data_'.length));
+  } else if (cyClasses instanceof Array) {
+    classes = cyClasses
+      .filter((c) => c.startsWith('user_data_'))
+      .map((c) => c.substring('user_data_'.length));
+  } else if (typeof cyClasses === 'undefined') {
+    classes = [];
+  } else {
+    throw new Error(
+      `Unrecognized type of element.cyClasses(): ${typeof cyClasses}`,
+    );
+  }
+  const d: ElementDefinition = {
+    data: e.data(),
+    classes,
+  };
+  if (e.isNode()) {
+    d.position = e.position();
+  }
+  return d;
+}
+
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
@@ -401,8 +430,11 @@ export class AppComponent implements OnInit, OnDestroy {
   );
   private transformedGraph: Graph<Value>;
   private style: Stylesheet[] = [];
-  selected: cytoscape.SingularElementReturnValue | undefined = undefined;
+  private selected: cytoscape.SingularElementReturnValue | undefined =
+    undefined;
+  selectedDefinition: ElementDefinition | undefined = undefined;
   selection: cytoscape.CollectionReturnValue | undefined = undefined;
+  selectionDefinition: ElementDefinition[] | undefined = undefined;
   multipleSelected = false;
   private savedPositions = new Map<string, cytoscape.Position>();
   get title(): string {
@@ -802,10 +834,13 @@ export class AppComponent implements OnInit, OnDestroy {
   private updateSelectionData() {
     const selection = this.cy?.$('*:selected');
     this.selection = selection;
+    this.selectionDefinition = selection ? selection.map(toDefinition) : [];
     if (selection?.length === 1) {
       this.selected = selection[0];
+      this.selectedDefinition = this.selectionDefinition[0];
     } else {
       this.selected = undefined;
+      this.selectedDefinition = undefined;
     }
     this.multipleSelected = (selection?.length ?? 0) > 1;
   }

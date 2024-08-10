@@ -16,7 +16,7 @@
 
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 
-import { CLASS_LIST_REGEX } from '../models';
+import { CLASS_LIST_REGEX, ElementDefinition } from '../models';
 import { parseClasses } from '../util';
 import { FormsModule } from '@angular/forms';
 import { MatInput } from '@angular/material/input';
@@ -31,42 +31,23 @@ import { MatFormField, MatLabel } from '@angular/material/form-field';
 })
 export class ElementPropertiesComponent {
   readonly classesPattern = CLASS_LIST_REGEX;
-  private _element?: cytoscape.SingularElementReturnValue = undefined;
-  @Input() set element(value: cytoscape.SingularElementReturnValue) {
-    this._element = value;
-    this.id = this._element.id();
-    this.label = this._element.data('label') ?? '';
-    const classes = this._element.classes();
-    if (typeof classes === 'string') {
-      this.classes = (classes as string)
-        .split(',')
-        .filter((c) => c.startsWith('user_data_'))
-        .map((c) => c.substring('user_data_'.length))
-        .join(',');
-    } else if (classes instanceof Array) {
-      this.classes = classes
-        .filter((c) => c.startsWith('user_data_'))
-        .map((c) => c.substring('user_data_'.length))
-        .join(',');
-    } else if (typeof classes === 'undefined') {
-      this.classes = '';
-    } else {
-      throw new Error(
-        `Unrecognized type of element.classes(): ${typeof classes}`,
-      );
-    }
-    this.description = this._element.data('description') ?? '';
+  @Input() set element(value: ElementDefinition) {
+    this.id = value.data.id;
+    this.label = value.data['label'] ?? '';
+    this.classes = value.classes ?? [];
+    this.description = value.data['description'] ?? '';
   }
   @Input() editMode = false;
   @Output() classesChange = new EventEmitter<string[]>();
   @Output() labelChange = new EventEmitter<string>();
   @Output() descriptionChange = new EventEmitter<string>();
   id = '';
-  classes = '';
+  classes: string[] = [];
   label = '';
   description = '';
 
-  onClassesChanged() {
-    this.classesChange.emit(parseClasses(this.classes));
+  onClassesChanged(classes: string) {
+    this.classes = parseClasses(classes);
+    this.classesChange.emit(this.classes);
   }
 }

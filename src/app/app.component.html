@@ -108,18 +108,18 @@
               Selected element
             </mat-panel-title>
           </mat-expansion-panel-header>
-          @if (selected) {
+          @if (selectedDefinition) {
             <element-properties
-              [element]="selected"
+              [element]="selectedDefinition"
               [editMode]="editMode"
               (classesChange)="onClassesChange($event)"
               (labelChange)="onLabelChange($event)"
               (descriptionChange)="onDescriptionChange($event)"/>
           }
-          @if (!selected && !multipleSelected) {
+          @if (!selectedDefinition && !multipleSelected) {
             Nothing selected.
           }
-          @if (!selected && multipleSelected) {
+          @if (!selectedDefinition && multipleSelected) {
             <multi-element-properties
               [selection]="selection"
               [editMode]="editMode"
