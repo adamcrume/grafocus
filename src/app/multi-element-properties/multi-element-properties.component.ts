@@ -16,13 +16,21 @@
 
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 
-import * as cytoscape from 'cytoscape';
-import { CLASS_LIST_REGEX } from '../models';
-import { parseClasses } from '../util';
+import { ElementDefinition } from '../models';
+import { COMMA, ENTER } from '@angular/cdk/keycodes';
 import { MatButton } from '@angular/material/button';
 import { FormsModule } from '@angular/forms';
 import { MatInput } from '@angular/material/input';
 import { MatFormField, MatLabel } from '@angular/material/form-field';
+import {
+  MatChip,
+  MatChipsModule,
+  MatChipSet,
+  MatChipRemove,
+  MatChipEditedEvent,
+  MatChipInputEvent,
+} from '@angular/material/chips';
+import { MatIcon } from '@angular/material/icon';
 
 function intersection<T>(left: Set<T>, right: Set<T>): Set<T> {
   const result = new Set<T>();
@@ -52,53 +60,83 @@ interface Classes {
   templateUrl: './multi-element-properties.component.html',
   styleUrls: ['./multi-element-properties.component.scss'],
   standalone: true,
-  imports: [MatFormField, MatLabel, MatInput, FormsModule, MatButton],
+  imports: [
+    MatChip,
+    MatChipsModule,
+    MatChipSet,
+    MatChipRemove,
+    MatFormField,
+    MatIcon,
+    MatLabel,
+    MatInput,
+    FormsModule,
+    MatButton,
+  ],
 })
 export class MultiElementPropertiesComponent {
-  readonly classesPattern = CLASS_LIST_REGEX;
+  readonly separatorKeysCodes = [ENTER, COMMA] as const;
   private oldSelection: cytoscape.Collection | undefined = undefined;
   @Input() selection?: cytoscape.Collection = undefined;
+  private oldElements?: ElementDefinition[];
+  @Input() elements?: ElementDefinition[];
   @Input() editMode = false;
   @Output() classesAdded = new EventEmitter<string[]>();
   @Output() classesRemoved = new EventEmitter<string[]>();
-  classesInput = '';
+  @Output() classEdited = new EventEmitter<[string, string]>();
 
   private _classes: Classes = {
     common: [],
     disjoint: [],
   };
   get classes(): Classes {
-    if (this.selection !== this.oldSelection) {
+    if (this.elements !== this.oldElements) {
       this._classes = (() => {
-        const selection = this.selection;
-        if (!selection || selection.empty()) {
+        const elements = this.elements;
+        if (!elements?.length) {
           return {
             common: [],
             disjoint: [],
           };
         }
-        let common = new Set<string>(selection[0].classes());
-        let union = new Set<string>(selection[0].classes());
-        for (const element of selection) {
-          common = intersection(common, new Set<string>(element.classes()));
-          for (const cls of element.classes()) {
+        let common = new Set<string>(elements[0].classes);
+        let union = new Set<string>(elements[0].classes);
+        for (const element of elements) {
+          common = intersection(common, new Set<string>(element.classes));
+          for (const cls of element.classes ?? []) {
             union.add(cls);
           }
         }
         return {
-          common: [...common],
-          disjoint: [...difference(union, common)],
+          common: [...common].map((c) => c.replace(/^user_data_/, '')),
+          disjoint: [...difference(union, common)].map((c) =>
+            c.replace(/^user_data_/, ''),
+          ),
         };
       })();
+      this.oldElements = this.elements;
     }
     return this._classes;
   }
 
-  removeClasses() {
-    this.classesRemoved.emit(parseClasses(this.classesInput));
+  editClass(cls: string, e: MatChipEditedEvent) {
+    const newCls = e.value.trim();
+    if (newCls) {
+      this.classEdited.emit([cls, e.value]);
+    } else {
+      this.classesRemoved.emit([cls]);
+    }
   }
 
-  addClasses() {
-    this.classesAdded.emit(parseClasses(this.classesInput));
+  removeClass(cls: string) {
+    this.classesRemoved.emit([cls]);
+  }
+
+  addClass(e: MatChipInputEvent) {
+    const cls = e.value.trim();
+    e.chipInput!.clear();
+    if (!cls) {
+      return;
+    }
+    this.classesAdded.emit([cls]);
   }
 }

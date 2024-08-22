@@ -14,9 +14,21 @@
  * limitations under the License.
  */
 
+import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { FormsModule } from '@angular/forms';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import {
+  MatChip,
+  MatChipsModule,
+  MatChipSet,
+  MatChipRemove,
+} from '@angular/material/chips';
 
 import { MultiElementPropertiesComponent } from './multi-element-properties.component';
+import { MultiElementPropertiesComponentHarness } from './multi-element-properties.component.harness';
 
 describe('MultiElementPropertiesComponent', () => {
   let component: MultiElementPropertiesComponent;
@@ -24,7 +36,17 @@ describe('MultiElementPropertiesComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [MultiElementPropertiesComponent],
+      imports: [
+        FormsModule,
+        MatChip,
+        MatChipsModule,
+        MatChipSet,
+        MatChipRemove,
+        MatFormFieldModule,
+        MatInputModule,
+        NoopAnimationsModule,
+        MultiElementPropertiesComponent,
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(MultiElementPropertiesComponent);
@@ -34,5 +56,61 @@ describe('MultiElementPropertiesComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('displays class chips', async () => {
+    const harness = await TestbedHarnessEnvironment.harnessForFixture(
+      fixture,
+      MultiElementPropertiesComponentHarness,
+    );
+    component.elements = [
+      {
+        data: { id: 'x' },
+        classes: ['foo', 'bar', 'baz'],
+      },
+    ];
+    fixture.detectChanges();
+
+    expect(await harness.classes()).toEqual(['foo', 'bar', 'baz']);
+  });
+
+  it('adds a class', async () => {
+    const harness = await TestbedHarnessEnvironment.harnessForFixture(
+      fixture,
+      MultiElementPropertiesComponentHarness,
+    );
+    const changes: string[][] = [];
+    component.classesAdded.subscribe((ch) => changes.push(ch));
+    component.editMode = true;
+    component.elements = [
+      {
+        data: { id: 'x' },
+        classes: ['foo', 'bar'],
+      },
+    ];
+    fixture.detectChanges();
+    await harness.addClass('baz');
+
+    expect(changes).toEqual([['baz']]);
+  });
+
+  it('removes a class', async () => {
+    const harness = await TestbedHarnessEnvironment.harnessForFixture(
+      fixture,
+      MultiElementPropertiesComponentHarness,
+    );
+    const changes: string[][] = [];
+    component.classesRemoved.subscribe((ch) => changes.push(ch));
+    component.editMode = true;
+    component.elements = [
+      {
+        data: { id: 'x' },
+        classes: ['foo', 'bar', 'baz'],
+      },
+    ];
+    fixture.detectChanges();
+    await harness.removeClass('bar');
+
+    expect(changes).toEqual([['bar']]);
   });
 });

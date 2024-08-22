@@ -16,7 +16,7 @@
 
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 
-import { CLASS_LIST_REGEX, ElementDefinition } from '../models';
+import { ElementDefinition } from '../models';
 import { COMMA, ENTER } from '@angular/cdk/keycodes';
 import { FormsModule } from '@angular/forms';
 import {
@@ -50,7 +50,6 @@ import { MatFormField, MatLabel } from '@angular/material/form-field';
 })
 export class ElementPropertiesComponent {
   readonly separatorKeysCodes = [ENTER, COMMA] as const;
-  readonly classesPattern = CLASS_LIST_REGEX;
   @Input() set element(value: ElementDefinition) {
     this.id = value.data.id;
     this.label = value.data['label'] ?? '';

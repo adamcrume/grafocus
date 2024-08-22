@@ -14,31 +14,54 @@
  limitations under the License.
 -->
 
-<p>
-  Common classes: {{classes.common.join(', ')}}
-</p>
-<p>
-  Other classes: {{classes.disjoint.join(', ')}}
-</p>
-
 @if (editMode) {
   <mat-form-field>
     <mat-label>Classes</mat-label>
-    <input
-      type="text"
-      matInput
-      #classesModel="ngModel"
-      [pattern]="classesPattern"
-      [(ngModel)]="classesInput">
+    <mat-chip-grid #chipGrid>
+      @for (cls of classes.common; track cls) {
+      <mat-chip-row
+        (removed)="removeClass(cls)"
+        [editable]="true"
+        (edited)="editClass(cls, $event)">
+        {{cls}}
+        <button matChipRemove>
+          <mat-icon>cancel</mat-icon>
+        </button>
+      </mat-chip-row>
+      }
+      <input
+        placeholder="Add class..."
+        [matChipInputFor]="chipGrid"
+        [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+        [matChipInputAddOnBlur]="true"
+        (matChipInputTokenEnd)="addClass($event)"
+        />
+    </mat-chip-grid>
   </mat-form-field>
-  <div class="buttons">
-    <button
-      mat-raised-button
-      [disabled]="!classesModel.valid"
-    (click)="removeClasses()">Remove</button>
-    <button
-      mat-raised-button
-      [disabled]="!classesModel.valid"
-    (click)="addClasses()">Add</button>
-  </div>
-}
+  } @else {
+<p>
+  Common classes:
+  <mat-chip-set>
+    @for (cls of classes.common; track cls) {
+    <mat-chip>{{cls}}</mat-chip>
+    }
+  </mat-chip-set>
+</p>
+  }
+
+<p>
+  Other classes:
+  @for (cls of classes.disjoint; track cls) {
+  <mat-chip-row
+    (removed)="removeClass(cls)"
+    [editable]="editMode"
+    (edited)="editClass(cls, $event)">
+    {{cls}}
+    @if (editMode) {
+    <button matChipRemove>
+      <mat-icon>cancel</mat-icon>
+    </button>
+    }
+  </mat-chip-row>
+  }
+</p>

@@ -1227,6 +1227,37 @@ export class AppComponent implements OnInit, OnDestroy {
     this.updateCustomData();
   }
 
+  onClassEdited(oldClass: string, newClass: string) {
+    const editClass = (classes: Immutable.Set<string>) => {
+      if (classes.has(oldClass)) {
+        classes.remove(oldClass);
+        classes.add(newClass);
+      }
+    };
+    for (const selected of this.selection ?? []) {
+      if (selected.source().length > 0) {
+        const edge = this.originalGraph.getEdgeByID(selected.id());
+        if (edge) {
+          this.originalGraph = this.originalGraph.setEdgeLabels(
+            selected.id(),
+            edge.labels.withMutations(editClass),
+          );
+        }
+      } else {
+        const node = this.originalGraph.getNodeByID(selected.id());
+        if (node) {
+          this.originalGraph = this.originalGraph.setNodeLabels(
+            selected.id(),
+            node.labels.withMutations(editClass),
+          );
+        }
+      }
+    }
+    this.transformGraph();
+    this.updateCustomData();
+    this.updateSelectionData();
+  }
+
   onClassesAdded(classes: string[]) {
     for (const selected of this.selection ?? []) {
       if (selected.source().length > 0) {
@@ -1257,6 +1288,7 @@ export class AppComponent implements OnInit, OnDestroy {
     }
     this.transformGraph();
     this.updateCustomData();
+    this.updateSelectionData();
   }
 
   onClassesRemoved(classes: string[]) {
@@ -1289,6 +1321,7 @@ export class AppComponent implements OnInit, OnDestroy {
     }
     this.transformGraph();
     this.updateCustomData();
+    this.updateSelectionData();
   }
 
   onGraphTitleChange(title: string) {

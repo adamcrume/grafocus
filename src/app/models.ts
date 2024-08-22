@@ -67,8 +67,6 @@ export const ID_REGEX_PART: string = '[_a-zA-Z][-_a-zA-Z0-9]*';
 
 export const ID_REGEX: string = '^' + ID_REGEX_PART + '$';
 
-export const CLASS_LIST_REGEX = `^${ID_REGEX_PART}(, *${ID_REGEX_PART})*$`;
-
 function validateElements(
   elements: ElementDefinition[],
 ): Map<string, ElementDefinition> {

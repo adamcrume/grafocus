@@ -121,8 +121,10 @@
           }
           @if (!selectedDefinition && multipleSelected) {
             <multi-element-properties
+              [elements]="selectionDefinition"
               [selection]="selection"
               [editMode]="editMode"
+              (classEdited)="onClassEdited($event[0], $event[1])"
               (classesAdded)="onClassesAdded($event)"
               (classesRemoved)="onClassesRemoved($event)"/>
           }
