@@ -29,10 +29,16 @@ export function createTransformation(
   query: string,
   enabled: boolean = false,
 ): Transformation {
-  return {
-    name,
-    query,
-    queryPlan: planQuery(parseQuery(query)),
-    enabled,
-  };
+  try {
+    return {
+      name,
+      query,
+      queryPlan: planQuery(parseQuery(query)),
+      enabled,
+    };
+  } catch (e: unknown) {
+    throw new Error(`Error creating transformation ${name}: ${e}`, {
+      cause: e,
+    });
+  }
 }
