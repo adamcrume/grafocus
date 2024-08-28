@@ -30,7 +30,7 @@ export interface Clause {
 
 export type ReadClause = Match;
 
-export type UpdateClause = Delete | Create | SetClause | RemoveClause;
+export type UpdateClause = Delete | Create | Merge | SetClause | RemoveClause;
 
 export interface Match extends Clause {
   kind: 'match';
@@ -40,6 +40,11 @@ export interface Match extends Clause {
 
 export interface Create extends Clause {
   kind: 'create';
+  path: Path;
+}
+
+export interface Merge extends Clause {
+  kind: 'merge';
   path: Path;
 }
 

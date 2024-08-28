@@ -14,7 +14,12 @@
  * limitations under the License.
  */
 
-import { planCreate } from './engine-create';
+import {
+  createPerMatch,
+  makeCreatePlan,
+  planCreate,
+  prepareCreate,
+} from './engine-create';
 import {
   edgeMatches,
   Func,
@@ -36,6 +41,7 @@ import {
 import {
   formatEdge,
   formatExpression,
+  formatPath,
   formatRemoveItem,
   formatSetItem,
   quoteIdentifier,
@@ -45,6 +51,7 @@ import {
   Direction,
   Edge as ASTEdge,
   Expression,
+  Merge,
   Node as ASTNode,
   Delete,
   Path,
@@ -651,13 +658,57 @@ function planRead(read: ReadClause): Stage {
       let matches = state.matches;
       for (const stage of plan.stages) {
         const preparedStage = stage.prepare(state.graph, state.queryStats);
-        const newMatches: Match[] = [];
-        for (const match of matches) {
-          newMatches.push(...preparedStage.execute(match));
-        }
-        matches = newMatches;
+        matches = matches.flatMap((m) => [...preparedStage.execute(m)]);
       }
       state.matches = matches;
+    },
+  };
+}
+
+function planMerge(merge: Merge): Stage {
+  const readPlan = makeReadPlan([merge.path], null);
+  const readStage: QueryPlanStage = {
+    stageName: () => 'merge_read',
+    stageChildren: () => readPlan.stages,
+    stageData: () => null,
+  };
+  const createPlan = makeCreatePlan(merge.path);
+  const createStage: QueryPlanStage = {
+    stageName: () => 'merge_create',
+    stageChildren: () => [],
+    stageData: () => formatPath(merge.path),
+  };
+  return {
+    stageName: () => 'merge',
+    stageChildren: () => [readStage, createStage],
+    stageData: () => null,
+    execute(state: State): void {
+      const preparedReadStages = readPlan.stages.map((s) =>
+        s.prepare(state.graph, state.queryStats),
+      );
+      const preparedCreate = prepareCreate(
+        createPlan,
+        state.graph,
+        state.queryStats,
+        state.functions,
+      );
+      const newMatches: Match[] = [];
+      for (const stateMatch of state.matches) {
+        let matches = [stateMatch];
+        for (const stage of preparedReadStages) {
+          matches = matches.flatMap((m) => [...stage.execute(m)]);
+        }
+        if (matches.length) {
+          newMatches.push(...matches);
+        } else {
+          state.graph = state.graph.withMutations((mutation) => {
+            newMatches.push(
+              createPerMatch(stateMatch, preparedCreate, state, mutation),
+            );
+          });
+        }
+      }
+      state.matches = newMatches;
     },
   };
 }
@@ -861,6 +912,8 @@ function planRemove(remove_: RemoveClause): Stage {
 function planUpdate(update: UpdateClause): Stage {
   if (update.kind === 'create') {
     return planCreate(update);
+  } else if (update.kind === 'merge') {
+    return planMerge(update);
   } else if (update.kind === 'delete') {
     return planDelete(update);
   } else if (update.kind === 'set') {

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import Immutable from 'immutable';
 import {
   describeQueryPlan,
   planQuery,
@@ -870,5 +871,102 @@ describe('execute', () => {
         .createNode('n3', ['bar', 'baz']),
     );
     expect(data).toEqual([[''], ['bar,baz'], ['foo']]);
+  });
+
+  describe('merge', () => {
+    it('can insert into an empty graph', () => {
+      const { graph, data } = executeQuery(
+        'merge (n:foo) return labels(n)',
+        newGraph(),
+      );
+      const nodes = [...graph.nodes];
+      expect(nodes.map((n) => n.labels)).toEqual([Immutable.Set(['foo'])]);
+      expect(data).toEqual([['foo']]);
+    });
+
+    it('can match existing nodes', () => {
+      const { graph, data } = executeQuery(
+        'merge (n:foo) return n',
+        newGraph()
+          .createNode('n1', [])
+          .createNode('n2', ['foo'])
+          .createNode('n3', ['foo', 'bar'])
+          .createNode('n4', ['bar']),
+      );
+      const nodes = [...graph.nodes];
+      expect(nodes.map((n) => n.id)).toEqual(['n1', 'n2', 'n3', 'n4']);
+      expect(data).toEqual([['n2'], ['n3']]);
+    });
+
+    it('can match existing edges', () => {
+      const { graph, data } = executeQuery(
+        'merge (n1:foo)-[e:FOO]->(n2:bar) return n1, e, n2',
+        newGraph()
+          .createNode('n1', ['foo'])
+          .createNode('n2', ['bar'])
+          .createEdge('e1', 'n1', 'n2', ['FOO']),
+      );
+      const nodes = [...graph.nodes];
+      expect(nodes.map((n) => [...n.labels])).toEqual([['foo'], ['bar']]);
+      const edges = [...graph.edges];
+      expect(edges.map((e) => [...e.labels])).toEqual([['FOO']]);
+      expect(data).toEqual([['n1', 'e1', 'n2']]);
+    });
+
+    it('matches all or nothing', () => {
+      const { graph, data } = executeQuery(
+        'merge (n1:foo)-[e:FOO]->(n2:bar) return n1, e, n2',
+        newGraph().createNode('n1', ['foo']).createNode('n2', ['bar']),
+      );
+      const nodes = [...graph.nodes];
+      expect(nodes.map((n) => [...n.labels])).toEqual([
+        ['foo'],
+        ['bar'],
+        ['foo'],
+        ['bar'],
+      ]);
+      const edges = [...graph.edges];
+      expect(edges.map((e) => [...e.labels])).toEqual([['FOO']]);
+      expect(data.length).toEqual(1);
+      const row = data[0];
+      expect(row[0]).not.toEqual('n1');
+      expect(row[2]).not.toEqual('n2');
+    });
+
+    it('can create edges between existing nodes', () => {
+      const { graph, data } = executeQuery(
+        'match (n1:foo), (n2:bar) merge (n1)-[e:FOO]->(n2) return n1, e, n2',
+        newGraph().createNode('n1', ['foo']).createNode('n2', ['bar']),
+      );
+      const nodes = [...graph.nodes];
+      expect(nodes.map((n) => [...n.labels])).toEqual([['foo'], ['bar']]);
+      const edges = [...graph.edges];
+      expect(edges.map((e) => [...e.labels])).toEqual([['FOO']]);
+      expect(data.length).toEqual(1);
+      const row = data[0];
+      expect(row[0]).toEqual('n1');
+      expect(row[2]).toEqual('n2');
+    });
+
+    it('can match and create', () => {
+      const { graph, data } = executeQuery(
+        'match (n1:foo), (n2:bar) merge (n1)-[e:FOO]->(n2) return n1, e, n2',
+        newGraph()
+          .createNode('n1', ['foo'])
+          .createNode('n2a', ['bar'])
+          .createNode('n2b', ['bar'])
+          .createEdge('e1', 'n1', 'n2a', ['FOO']),
+      );
+      expect([...graph.nodes].length).toEqual(3);
+      const edges = [...graph.edges];
+      expect(edges.map((e) => [...e.labels])).toEqual([['FOO'], ['FOO']]);
+      expect(data.length).toEqual(2);
+      expect(data[0][0]).toEqual('n1');
+      expect(data[0][1]).toEqual('e1');
+      expect(data[0][2]).toEqual('n2a');
+      expect(data[1][0]).toEqual('n1');
+      expect(data[1][1]).not.toEqual('e1');
+      expect(data[1][2]).toEqual('n2b');
+    });
   });
 });

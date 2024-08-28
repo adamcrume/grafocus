@@ -114,7 +114,7 @@ function planCreateEdge(e: ASTEdge): CreateEdgePlan {
   };
 }
 
-function partiallyEvaluateCreate(
+export function prepareCreate(
   createPlan: CreatePlan,
   graph: Graph<Value>,
   queryStats: QueryStatsState,
@@ -136,7 +136,7 @@ function partiallyEvaluateCreate(
   };
 }
 
-function createPerMatch(
+export function createPerMatch(
   match: Match,
   partiallyEvaluatedPlan: PartiallyEvaluatedCreatePlan,
   state: State,
@@ -195,7 +195,7 @@ function createPerMatch(
   return match;
 }
 
-function makeCreatePlan(path: Path): CreatePlan {
+export function makeCreatePlan(path: Path): CreatePlan {
   return {
     pathNodes: path.nodes.map(planCreateNode),
     pathEdges: path.edges.map(planCreateEdge),
@@ -214,7 +214,7 @@ export function planCreate(create: Create): Stage {
     stageChildren: () => [],
     stageData: () => formatPath(create.path),
     execute(state: State): void {
-      const partiallyEvaluated = partiallyEvaluateCreate(
+      const partiallyEvaluated = prepareCreate(
         createPlan,
         state.graph,
         state.queryStats,

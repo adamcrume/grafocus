@@ -46,7 +46,7 @@ query = reads:readClause|.., sp| sp tail:(
 
 readClause = match
 
-updateClause = create / delete / set / remove
+updateClause = create / merge / delete / set / remove
 
 // query = clauses:clause |1.., sp| {
 //   return {
@@ -59,6 +59,13 @@ updateClause = create / delete / set / remove
 create = "create"i sp path:path {
   return {
     kind: 'create',
+    path,
+  };
+}
+
+merge = "merge"i sp path:path {
+  return {
+    kind: 'merge',
     path,
   };
 }
