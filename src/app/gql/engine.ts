@@ -239,6 +239,7 @@ interface State {
   createNodeID: () => string;
   createEdgeID: () => string;
   queryStats: QueryStatsState;
+  functions: Map<string, Func>;
 }
 
 interface Stage extends QueryPlanStage {
@@ -287,6 +288,9 @@ function labelsMatch(
 }
 
 function valueMatches(value: Value | undefined, pattern: Expression): boolean {
+  if (pattern.kind === 'functionCall') {
+    throw new Error(`Matching properties with function is not yet implemented`);
+  }
   // TODO: make smarter
   return value?.value === pattern.value;
 }
@@ -305,7 +309,7 @@ function nodeMatches(
   if (pattern.properties !== null) {
     for (const [k, v] of pattern.properties) {
       if (k === '_ID') {
-        if (node.id !== v.value) {
+        if (!valueMatches(stringValue(node.id), v)) {
           return false;
         }
       } else if (!valueMatches(node.properties.get(k), v)) {
@@ -325,7 +329,7 @@ function edgeMatches(edge: Edge<Value>, pattern: ASTEdge): boolean {
   if (pattern.properties !== null) {
     for (const [k, v] of pattern.properties) {
       if (k === '_ID') {
-        if (edge.id !== v.value) {
+        if (!valueMatches(stringValue(edge.id), v)) {
           return false;
         }
       } else if (!valueMatches(edge.properties.get(k), v)) {
@@ -1201,14 +1205,14 @@ function planCreate(create: Create): Stage {
           pathNodes.map((n) => ({
             ...n,
             properties: n.properties.map(([k, v]) => {
-              return [k, v(state.graph, state.queryStats)];
+              return [k, v(state.graph, state.queryStats, state.functions)];
             }),
           }));
         const partiallyEvaluatedPathEdges: PartiallyEvaluatedEdgePlan[] =
           pathEdges.map((e) => ({
             ...e,
             properties: e.properties.map(([k, v]) => {
-              return [k, v(state.graph, state.queryStats)];
+              return [k, v(state.graph, state.queryStats, state.functions)];
             }),
           }));
         for (const match of state.matches) {
@@ -1301,8 +1305,9 @@ function planSet(set_: SetClause): Stage {
         graph: Graph<Value>,
         m: GraphMutation<Value>,
         queryStats: QueryStatsState,
+        functions: Map<string, Func>,
       ) => {
-        const partialExpression = expression(graph, queryStats);
+        const partialExpression = expression(graph, queryStats, functions);
         return (match: Match) => {
           const value = match.get(variable);
           if (!value) {
@@ -1363,7 +1368,7 @@ function planSet(set_: SetClause): Stage {
     execute(state: State): void {
       state.graph = state.graph.withMutations((m) => {
         const partialItems = items.map((item) =>
-          item(state.graph, m, state.queryStats),
+          item(state.graph, m, state.queryStats, state.functions),
         );
         for (const match of state.matches) {
           for (const item of partialItems) {
@@ -1462,9 +1467,47 @@ function planUpdate(update: UpdateClause): Stage {
   }
 }
 
+type FunctionPlan = (args: Value[], variables: Match) => Value;
+
+type Func = (graph: Graph<Value>, queryStats: QueryStatsState) => FunctionPlan;
+
+function makeNodeOrEdgeFunc(f: (a: Node<Value> | Edge<Value>) => Value): Func {
+  return (graph: Graph<Value>, queryStats: QueryStatsState) => {
+    return (args: Value[], variables: Match) => {
+      if (args.length !== 1) {
+        throw new Error(`Expected 1 argument, found ${args.length}`);
+      }
+      const arg = args[0];
+      let id = tryCastNodeRef(args[0]);
+      if (id !== undefined) {
+        const node = graph.getNodeByID(id);
+        if (node === undefined) {
+          throw new Error(`Node ${id} not found`);
+        }
+        return f(node);
+      }
+      id = tryCastEdgeRef(args[0]);
+      if (id !== undefined) {
+        const edge = graph.getEdgeByID(id);
+        if (edge === undefined) {
+          throw new Error(`Edge ${id} not found`);
+        }
+        return f(edge);
+      }
+      throw new Error(`Expected a node or edge, found ${args[0].type.kind}`);
+    };
+  };
+}
+
+const funcLabels: Func = makeNodeOrEdgeFunc(
+  (x: Node<Value> | Edge<Value>): Value =>
+    listValue([...x.labels].map(stringValue)),
+);
+
 type EvaluatePlan = (
   graph: Graph<Value>,
   queryStats: QueryStatsState,
+  functions: Map<string, Func>,
 ) => (variables: Match) => Value;
 
 function planEvaluate(expression: Expression): EvaluatePlan {
@@ -1486,8 +1529,12 @@ function planEvaluate(expression: Expression): EvaluatePlan {
     };
   } else if (expression.kind === 'not') {
     const inner = planEvaluate(expression.value);
-    return (graph: Graph<Value>, queryStats: QueryStatsState) => {
-      const evaluate = inner(graph, queryStats);
+    return (
+      graph: Graph<Value>,
+      queryStats: QueryStatsState,
+      functions: Map<string, Func>,
+    ) => {
+      const evaluate = inner(graph, queryStats, functions);
       return (variables: Match) => {
         // TODO: test
         const b = tryCastBoolean(evaluate(variables));
@@ -1516,6 +1563,28 @@ function planEvaluate(expression: Expression): EvaluatePlan {
         const foundMatch = !matches.next().done;
         return booleanValue(foundMatch);
       };
+  } else if (expression.kind === 'functionCall') {
+    const plans = expression.args.map(planEvaluate);
+    return (
+      graph: Graph<Value>,
+      queryStats: QueryStatsState,
+      functions: Map<string, Func>,
+    ) => {
+      const func = functions.get(expression.name);
+      if (!func) {
+        throw new Error(`Unrecognized function: ${expression.name}`);
+      }
+      const funcEvaluate = func(graph, queryStats);
+      const argsEvaluate = plans.map((arg: EvaluatePlan) =>
+        arg(graph, queryStats, functions),
+      );
+      return (variables: Match) => {
+        const argValues = argsEvaluate.map((arg: (m: Match) => Value) =>
+          arg(variables),
+        );
+        return funcEvaluate(argValues, variables);
+      };
+    };
   } else {
     throw new Error(`Unrecognized expression: ${JSON.stringify(expression)}`);
   }
@@ -1531,7 +1600,7 @@ function planReturn(returnClause: ReturnClause): Stage {
     },
     execute(state: State): void {
       const partialExpressions = expressions.map((e) =>
-        e(state.graph, state.queryStats),
+        e(state.graph, state.queryStats, state.functions),
       );
       state.returnValue = state.matches.map((m) =>
         partialExpressions.map((e) => e(m)),
@@ -1597,6 +1666,7 @@ export function planQuery(query: ASTQuery, options?: QueryOptions): QueryPlan {
             }
           },
         },
+        functions: new Map<string, Func>([['labels', funcLabels]]),
       };
       for (const stage of stages) {
         stage.execute(state);

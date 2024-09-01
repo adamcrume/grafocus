@@ -141,8 +141,15 @@ export interface PathExpression {
   value: Path;
 }
 
+export interface FunctionCall {
+  kind: 'functionCall';
+  name: string;
+  args: Expression[];
+}
+
 export type Expression =
   | And
+  | FunctionCall
   | Identifier
   | Not
   | NumberLiteral

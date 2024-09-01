@@ -160,6 +160,13 @@ export function numberList(values: number[]): Value {
   };
 }
 
+export function tryCastString(value: Value | undefined): string | undefined {
+  if (value?.type?.kind === 'string') {
+    return value.value as string;
+  }
+  return undefined;
+}
+
 export function tryCastBoolean(value: Value | undefined): boolean | undefined {
   if (value?.type?.kind === 'boolean') {
     return value.value as boolean;

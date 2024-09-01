@@ -228,7 +228,16 @@ stringLiteral = singleQuoteLiteral / doubleQuoteLiteral
 literal = n:numberLiteral {return {kind: 'number', value: n}} /
           s:stringLiteral {return {kind: 'string', value: s}}
 
+functionInvocation = name:identifier sp "(" sp args:expression|0.., sp "," sp| sp ")" {
+  return {
+    kind: 'functionCall',
+    name,
+    args,
+  }
+}
+
 atom = literal /
+       @functionInvocation /
        i:identifier {return {kind: 'identifier', value: i}} /
        p:path {return {kind: 'path', value: p}} /
        "(" @expression ")"

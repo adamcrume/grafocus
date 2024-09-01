@@ -32,6 +32,7 @@ import {
   tryCastList,
   tryCastNodeRef,
   tryCastEdgeRef,
+  tryCastString,
   Value,
 } from './values';
 import { parseQuery } from './parser';
@@ -43,6 +44,10 @@ function newGraph(): Graph<Value> {
 function nodeRows(result: Value[][] | undefined): string[][] {
   return [...(result || [])].map((r) =>
     r.map((v) => {
+      const s = tryCastString(v);
+      if (s !== undefined) {
+        return s;
+      }
       const id = tryCastNodeRef(v) ?? tryCastEdgeRef(v);
       if (id !== undefined) {
         return id;
@@ -51,6 +56,10 @@ function nodeRows(result: Value[][] | undefined): string[][] {
       if (list !== undefined) {
         return list
           .map((elt) => {
+            const s = tryCastString(elt);
+            if (s !== undefined) {
+              return s;
+            }
             const eltId = tryCastNodeRef(elt) ?? tryCastEdgeRef(elt);
             if (eltId !== undefined) {
               return eltId;
@@ -850,5 +859,16 @@ describe('execute', () => {
       throw new Error(`e1 not found`);
     }
     expect([...e1.labels]).toEqual(['foo']);
+  });
+
+  it('can list node labels', () => {
+    const { data } = executeQuery(
+      'match (n) return labels(n)',
+      newGraph()
+        .createNode('n1', [])
+        .createNode('n2', ['foo'])
+        .createNode('n3', ['bar', 'baz']),
+    );
+    expect(data).toEqual([[''], ['bar,baz'], ['foo']]);
   });
 });
