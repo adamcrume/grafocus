@@ -14,26 +14,38 @@
  * limitations under the License.
  */
 
-import Immutable from 'immutable';
+import { planCreate } from './engine-create';
+import {
+  edgeMatches,
+  expandMatch,
+  Func,
+  Match,
+  MatchInitializer,
+  MatchStep,
+  matchSteps,
+  PathMatch,
+  planEvaluate,
+  QueryPlanStage,
+  QueryPlanStageData,
+  QueryStatsState,
+  ScanGraph,
+  Scope,
+  Stage,
+  State,
+} from './engine-core';
 import {
   formatEdge,
   formatExpression,
-  formatLabelExpression,
-  formatMapLiteral,
-  formatPath,
   formatRemoveItem,
   formatSetItem,
   quoteIdentifier,
 } from './formatter';
 import { Edge, Graph, GraphMutation, Node } from './graph';
-import { iter } from './iter';
 import {
-  Create,
   Direction,
   Edge as ASTEdge,
   Expression,
   Delete,
-  LabelExpression,
   Node as ASTNode,
   Path,
   Query as ASTQuery,
@@ -44,17 +56,10 @@ import {
   UpdateClause,
 } from './parser';
 import {
-  booleanValue,
   checkCastNodeRef,
-  EdgeRef,
-  edgeRefValue,
   listValue,
-  NodeRef,
-  nodeRefValue,
-  numberValue,
   serializeValue,
   stringValue,
-  tryCastBoolean,
   tryCastEdgeRef,
   tryCastNodeRef,
   Value,
@@ -74,20 +79,6 @@ export interface QueryPlan {
   execute(graph: Graph<Value>): ExecuteQueryResult;
 
   stages(): QueryPlanStage[];
-}
-
-export type QueryPlanStageData =
-  | null
-  | string
-  | string[]
-  | Array<[string, string | null]>;
-
-export interface QueryPlanStage {
-  stageName(): string;
-
-  stageChildren(): QueryPlanStage[];
-
-  stageData(): QueryPlanStageData;
 }
 
 export function describeQueryPlan(plan: QueryPlan): string {
@@ -145,54 +136,6 @@ function describeQueryPlanStage(stage: QueryPlanStage, indent: number): string {
   return result;
 }
 
-type Match = Scope<string, Value>;
-
-class Scope<K, V> {
-  private readonly vars: Immutable.Map<K, V>;
-
-  constructor(
-    private readonly parent?: Scope<K, V>,
-    vars?: Map<K, V> | Immutable.Map<K, V>,
-  ) {
-    this.vars = Immutable.Map(vars);
-  }
-
-  ownVars(): Immutable.Map<K, V> {
-    return this.vars;
-  }
-
-  has(key: K): boolean {
-    return this.vars.has(key) || this.parent?.has(key) || false;
-  }
-
-  get(key: K): V | undefined {
-    return this.vars.get(key) ?? this.parent?.get(key);
-  }
-
-  set(key: K, value: V): Scope<K, V> {
-    return new Scope(this.parent, this.vars.set(key, value));
-  }
-
-  keys(): Immutable.Set<K> {
-    return (this.parent?.keys() ?? Immutable.Set()).withMutations((keys) => {
-      for (const k of this.vars.keys()) {
-        keys.add(k);
-      }
-    });
-  }
-
-  toImmutableMap(): Immutable.Map<K, V> {
-    if (!this.parent) {
-      return this.vars;
-    }
-    return this.parent.toImmutableMap().withMutations((map) => {
-      for (const [k, v] of this.vars) {
-        map.set(k, v);
-      }
-    });
-  }
-}
-
 // For every A in left and B in right such that their common keys map to the
 // same values, output A+B.
 function joinMatches(left: Match[], right: Match[]): Match[] {
@@ -228,24 +171,6 @@ function joinMatches(left: Match[], right: Match[]): Match[] {
   return result;
 }
 
-interface QueryStatsState {
-  countNodeVisit: () => void;
-}
-
-interface State {
-  graph: Graph<Value>;
-  matches: Match[];
-  returnValue: Array<Array<Value>> | undefined;
-  createNodeID: () => string;
-  createEdgeID: () => string;
-  queryStats: QueryStatsState;
-  functions: Map<string, Func>;
-}
-
-interface Stage extends QueryPlanStage {
-  execute(state: State): void;
-}
-
 interface Stagelet extends QueryPlanStage {
   execute(
     matches: Match[],
@@ -259,85 +184,6 @@ interface FilterStage extends QueryPlanStage {
     graph: Graph<Value>,
     queryStats: QueryStatsState,
   ): (match: Match) => boolean;
-}
-
-function labelsMatch(
-  labels: Immutable.Set<string>,
-  pattern: LabelExpression,
-): boolean {
-  if (pattern.kind === 'identifier') {
-    if (pattern.value === '_VIRTUAL') {
-      for (const x of labels) {
-        if (x.startsWith('_')) {
-          return true;
-        }
-      }
-      return false;
-    } else {
-      return labels.has(pattern.value);
-    }
-  } else if (pattern.kind === 'negation') {
-    return !labelsMatch(labels, pattern.value);
-  } else if (pattern.kind === 'conjunction') {
-    return pattern.values.every((x) => labelsMatch(labels, x));
-  } else if (pattern.kind === 'disjunction') {
-    return pattern.values.some((x) => labelsMatch(labels, x));
-  } else {
-    throw new Error(`Unrecognized label pattern ${JSON.stringify(pattern)}`);
-  }
-}
-
-function valueMatches(value: Value | undefined, pattern: Expression): boolean {
-  if (pattern.kind === 'functionCall') {
-    throw new Error(`Matching properties with function is not yet implemented`);
-  }
-  // TODO: make smarter
-  return value?.value === pattern.value;
-}
-
-function nodeMatches(
-  node: Node<Value>,
-  pattern: ASTNode,
-  queryStats: QueryStatsState,
-): boolean {
-  queryStats.countNodeVisit();
-  if (pattern.label !== null) {
-    if (!labelsMatch(node.labels, pattern.label)) {
-      return false;
-    }
-  }
-  if (pattern.properties !== null) {
-    for (const [k, v] of pattern.properties) {
-      if (k === '_ID') {
-        if (!valueMatches(stringValue(node.id), v)) {
-          return false;
-        }
-      } else if (!valueMatches(node.properties.get(k), v)) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
-function edgeMatches(edge: Edge<Value>, pattern: ASTEdge): boolean {
-  if (pattern.label !== null) {
-    if (!labelsMatch(edge.labels, pattern.label)) {
-      return false;
-    }
-  }
-  if (pattern.properties !== null) {
-    for (const [k, v] of pattern.properties) {
-      if (k === '_ID') {
-        if (!valueMatches(stringValue(edge.id), v)) {
-          return false;
-        }
-      } else if (!valueMatches(edge.properties.get(k), v)) {
-        return false;
-      }
-    }
-  }
-  return true;
 }
 
 class BuildReachabilitySet implements QueryPlanStage {
@@ -417,58 +263,6 @@ class CheckReachabilitySet implements QueryPlanStage {
       return false;
     }
     return reachability.has(id);
-  }
-}
-
-abstract class MatchStep implements QueryPlanStage {
-  abstract stageName(): string;
-  abstract stageChildren(): QueryPlanStage[];
-  abstract stageData(): QueryPlanStageData;
-  abstract match(
-    graph: Graph<Value>,
-    pos: PathMatch,
-    queryStats: QueryStatsState,
-  ): IterableIterator<PathMatch>;
-}
-
-abstract class MatchInitializer implements QueryPlanStage {
-  abstract stageName(): string;
-  abstract stageChildren(): QueryPlanStage[];
-  abstract stageData(): QueryPlanStageData;
-  abstract initial(
-    match: Match,
-    graph: Graph<Value>,
-  ): IterableIterator<PathMatch>;
-}
-
-class ScanGraph extends MatchInitializer {
-  constructor() {
-    super();
-  }
-
-  override stageName(): string {
-    return 'scan_graph';
-  }
-
-  override stageChildren(): QueryPlanStage[] {
-    return [];
-  }
-
-  override stageData(): null {
-    return null;
-  }
-
-  override *initial(
-    match: Match,
-    graph: Graph<Value>,
-  ): IterableIterator<PathMatch> {
-    for (const startNode of graph.nodes) {
-      yield {
-        match,
-        head: startNode,
-        traversedEdges: new Set(),
-      };
-    }
   }
 }
 
@@ -762,298 +556,6 @@ function filterByPathExistence(path: Path): FilterStage {
   };
 }
 
-class MatchNode extends MatchStep {
-  constructor(
-    readonly node: ASTNode,
-    readonly allowNewVariables: boolean,
-  ) {
-    super();
-  }
-
-  override stageName(): string {
-    return 'match_node';
-  }
-
-  override stageChildren(): QueryPlanStage[] {
-    return [];
-  }
-
-  override stageData(): QueryPlanStageData {
-    const n = this.node;
-    return [
-      ['name', n.name],
-      ['label', n.label === null ? null : formatLabelExpression(n.label)],
-      [
-        'properties',
-        n.properties === null ? null : formatMapLiteral(n.properties),
-      ],
-    ];
-  }
-
-  override *match(
-    graph: Graph<Value>,
-    pos: PathMatch,
-    queryStats: QueryStatsState,
-  ): IterableIterator<PathMatch> {
-    if (!nodeMatches(pos.head, this.node, queryStats)) {
-      return;
-    }
-    const name = this.node.name;
-    let match = pos.match;
-    if (name) {
-      if (pos.match.has(name)) {
-        const old = pos.match.get(name);
-        if (tryCastNodeRef(old) !== pos.head.id) {
-          return;
-        }
-      } else if (!this.allowNewVariables) {
-        throw new Error(
-          `Attempting to bind variable ${JSON.stringify(name)} in a position where it is not allowed`,
-        );
-      } else {
-        match = match.set(name, nodeRefValue(pos.head.id));
-      }
-    }
-    yield {
-      match,
-      traversedEdges: pos.traversedEdges,
-      head: pos.head,
-    };
-  }
-}
-
-class MatchEdge extends MatchStep {
-  constructor(
-    readonly edge: ASTEdge,
-    readonly allowNewVariables: boolean,
-  ) {
-    super();
-  }
-
-  override stageName(): string {
-    return 'match_edge';
-  }
-
-  override stageChildren(): QueryPlanStage[] {
-    return [];
-  }
-
-  override stageData(): QueryPlanStageData {
-    const e = this.edge;
-    return [
-      ['name', e.name],
-      ['direction', e.direction === 'NONE' ? null : e.direction],
-      ['label', e.label === null ? null : formatLabelExpression(e.label)],
-      [
-        'properties',
-        e.properties === null ? null : formatMapLiteral(e.properties),
-      ],
-      [
-        'quantifier',
-        e.quantifier === null ? null : JSON.stringify(e.quantifier),
-      ],
-    ];
-  }
-
-  override *match(
-    graph: Graph<Value>,
-    pos: PathMatch,
-    queryStats: QueryStatsState,
-  ): IterableIterator<PathMatch> {
-    const edges = [];
-    for (const [edge, next] of graph.outgoingNeighbors(pos.head)) {
-      edges.push({ edge, next, forbiddenDirection: 'LEFT' });
-    }
-    for (const [edge, next] of graph.incomingNeighbors(pos.head)) {
-      edges.push({ edge, next, forbiddenDirection: 'RIGHT' });
-    }
-    for (const { edge, next, forbiddenDirection } of edges) {
-      const direction = this.edge.direction;
-      if (
-        !pos.traversedEdges.has(edge) &&
-        direction !== forbiddenDirection &&
-        edgeMatches(edge, this.edge)
-      ) {
-        const name = this.edge.name;
-        let match = pos.match;
-        if (name) {
-          if (pos.match.has(name)) {
-            const old = pos.match.get(name);
-            if (tryCastEdgeRef(old) !== edge.id) {
-              continue;
-            }
-          } else if (!this.allowNewVariables) {
-            throw new Error(
-              `Attempting to bind variable ${JSON.stringify(name)} in a position where it is not allowed`,
-            );
-          } else {
-            match = match.set(name, edgeRefValue(edge.id));
-          }
-        }
-        const subTraversed = new Set(pos.traversedEdges);
-        subTraversed.add(edge);
-        yield {
-          match,
-          traversedEdges: subTraversed,
-          head: next,
-        };
-      }
-    }
-  }
-}
-
-class MatchQuantified extends MatchStep {
-  constructor(
-    readonly inner: MatchStep,
-    readonly min: number,
-    readonly max: number,
-    readonly freeVariables: Set<string>,
-  ) {
-    super();
-  }
-
-  override stageName(): string {
-    return 'match_quantified';
-  }
-
-  override stageChildren(): QueryPlanStage[] {
-    return [this.inner];
-  }
-
-  override stageData(): Array<[string, string]> {
-    return [
-      ['min', this.min.toString()],
-      ['max', this.max.toString()],
-    ];
-  }
-
-  override *match(
-    graph: Graph<Value>,
-    pos: PathMatch,
-    queryStats: QueryStatsState,
-  ): IterableIterator<PathMatch> {
-    const emptyVariables = new Map<string, Array<Value>>();
-    for (const k of this.freeVariables) {
-      emptyVariables.set(k, []);
-    }
-    let matches = [
-      {
-        pathMatch: pos,
-        variables: emptyVariables,
-      },
-    ];
-    let length = 0;
-    while (length < this.max && matches.length) {
-      if (length >= this.min) {
-        for (const m of matches) {
-          let match = pos.match;
-          for (const [k, v] of m.variables) {
-            match = match.set(k, listValue(v));
-          }
-          yield {
-            match,
-            head: m.pathMatch.head,
-            traversedEdges: m.pathMatch.traversedEdges,
-          };
-        }
-      }
-      const newMatches = [];
-      for (const p of matches) {
-        const scope = new Scope(pos.match);
-        const innerMatches = this.inner.match(
-          graph,
-          {
-            match: scope,
-            head: p.pathMatch.head,
-            traversedEdges: p.pathMatch.traversedEdges,
-          },
-          queryStats,
-        );
-        for (const m of innerMatches) {
-          const variables = new Map(p.variables);
-          for (const [k, v] of m.match.ownVars()) {
-            variables.set(k, [...(variables.get(k) ?? []), v]);
-          }
-          newMatches.push({
-            pathMatch: m,
-            variables,
-          });
-        }
-      }
-      matches = newMatches;
-      length++;
-    }
-  }
-}
-
-interface PathMatch {
-  match: Match;
-  head: Node<Value>;
-  traversedEdges: Set<Edge<Value>>;
-}
-
-function matchSteps(path: Path, allowNewVariables: boolean): MatchStep[] {
-  const steps: MatchStep[] = [];
-  steps.push(new MatchNode(path.nodes[0], allowNewVariables));
-  for (let i = 0; i < path.edges.length; i++) {
-    const edge = path.edges[i];
-    if (edge.quantifier) {
-      const freeVariables = new Set<string>();
-      if (edge.name) {
-        freeVariables.add(edge.name);
-      }
-      steps.push(
-        new MatchQuantified(
-          new MatchEdge(edge, allowNewVariables),
-          edge.quantifier.min,
-          edge.quantifier.max,
-          freeVariables,
-        ),
-      );
-    } else {
-      steps.push(new MatchEdge(edge, allowNewVariables));
-    }
-    steps.push(new MatchNode(path.nodes[i + 1], allowNewVariables));
-  }
-  return steps;
-}
-
-function* expandMatch(
-  initializer: MatchInitializer,
-  steps: MatchStep[],
-  match: Match,
-  graph: Graph<Value>,
-  queryStats: QueryStatsState,
-): IterableIterator<Match> {
-  interface Submatch {
-    pathMatch: PathMatch;
-    step: number;
-  }
-  let submatchIters = [
-    iter(initializer.initial(match, graph)).map((p) => ({
-      pathMatch: p,
-      step: 0,
-    })),
-  ];
-  while (true) {
-    const submatches = submatchIters.pop();
-    if (!submatches) {
-      return;
-    }
-    for (const submatch of submatches) {
-      if (submatch.step == steps.length) {
-        yield submatch.pathMatch.match;
-      } else {
-        submatchIters.push(
-          iter(
-            steps[submatch.step].match(graph, submatch.pathMatch, queryStats),
-          ).map((p) => ({ pathMatch: p, step: submatch.step + 1 })),
-        );
-      }
-    }
-  }
-}
-
 function fixedID(node: ASTNode): string | undefined {
   const idExpression = node.properties
     ?.filter(([k, v]) => k === '_ID')
@@ -1125,200 +627,6 @@ function planRead(read: ReadClause): Stage {
         matches = stage.execute(matches, state.graph, state.queryStats);
       }
       state.matches = matches;
-    },
-  };
-}
-
-interface CreateNodePlan {
-  name: string | null;
-  labels: string[];
-  properties: Array<[string, EvaluatePlan]>;
-}
-
-interface CreateEdgePlan {
-  name: string | null;
-  srcOffset: number;
-  dstOffset: number;
-  labels: string[];
-  properties: Array<[string, EvaluatePlan]>;
-}
-
-interface PartiallyEvaluatedCreateNodePlan {
-  name: string | null;
-  labels: string[];
-  properties: Array<[string, (match: Match) => Value]>;
-}
-
-interface PartiallyEvaluatedCreateEdgePlan {
-  name: string | null;
-  srcOffset: number;
-  dstOffset: number;
-  labels: string[];
-  properties: Array<[string, (match: Match) => Value]>;
-}
-
-interface CreatePlan {
-  pathNodes: Array<CreateNodePlan>;
-  pathEdges: Array<CreateEdgePlan>;
-}
-
-interface PartiallyEvaluatedCreatePlan {
-  partiallyEvaluatedPathNodes: PartiallyEvaluatedCreateNodePlan[];
-  partiallyEvaluatedPathEdges: PartiallyEvaluatedCreateEdgePlan[];
-}
-
-function planCreateNode(n: ASTNode): CreateNodePlan {
-  const labels: string[] = [];
-  if (n.label !== null) {
-    if (n.label.kind !== 'identifier') {
-      throw new Error(
-        `Only plain label identifiers are allowed in CREATE clauses, but found ${JSON.stringify(n.label)}`,
-      );
-    }
-    labels.push(n.label.value);
-  }
-  return {
-    name: n.name,
-    labels,
-    properties: (n.properties ?? []).map(([k, v]) => [k, planEvaluate(v)]),
-  };
-}
-
-function planCreateEdge(e: ASTEdge): CreateEdgePlan {
-  const labels: string[] = [];
-  if (e.label !== null) {
-    if (e.label.kind !== 'identifier') {
-      throw new Error(
-        `Only plain label identifiers are allowed in CREATE clauses, but found ${JSON.stringify(e.label)}`,
-      );
-    }
-    labels.push(e.label.value);
-  }
-  let properties: Array<[string, EvaluatePlan]> = (e.properties ?? []).map(
-    ([k, v]) => {
-      return [k, planEvaluate(v)];
-    },
-  );
-  return {
-    name: e.name,
-    srcOffset: e.direction === 'RIGHT' ? 0 : 1,
-    dstOffset: e.direction === 'RIGHT' ? 1 : 0,
-    labels,
-    properties: (e.properties ?? []).map(([k, v]) => [k, planEvaluate(v)]),
-  };
-}
-
-function partiallyEvaluateCreate(
-  createPlan: CreatePlan,
-  graph: Graph<Value>,
-  queryStats: QueryStatsState,
-  functions: Map<string, Func>,
-): PartiallyEvaluatedCreatePlan {
-  return {
-    partiallyEvaluatedPathNodes: createPlan.pathNodes.map((n) => ({
-      ...n,
-      properties: n.properties.map(([k, v]) => {
-        return [k, v(graph, queryStats, functions)];
-      }),
-    })),
-    partiallyEvaluatedPathEdges: createPlan.pathEdges.map((e) => ({
-      ...e,
-      properties: e.properties.map(([k, v]) => {
-        return [k, v(graph, queryStats, functions)];
-      }),
-    })),
-  };
-}
-
-function createPerMatch(
-  match: Match,
-  partiallyEvaluatedPlan: PartiallyEvaluatedCreatePlan,
-  state: State,
-  mutation: GraphMutation<Value>,
-): Match {
-  const nodeIDs: string[] =
-    partiallyEvaluatedPlan.partiallyEvaluatedPathNodes.map((n) => {
-      let properties: Array<[string, Value]> = n.properties.map(([k, v]) => {
-        return [k, v(match)];
-      });
-      if (n.name !== null) {
-        const element = match.get(n.name);
-        if (!element) {
-          const id = state.createNodeID();
-          mutation.createNode(id, n.labels, properties);
-          match = match.set(n.name, nodeRefValue(id));
-          return id;
-        }
-        const nodeRef = tryCastNodeRef(element);
-        if (nodeRef === undefined) {
-          throw new Error(`variable ${JSON.stringify(n.name)} is not a node`);
-        }
-        return nodeRef;
-      }
-      const id = state.createNodeID();
-      mutation.createNode(id, n.labels, properties);
-      return id;
-    });
-  for (
-    let i = 0;
-    i < partiallyEvaluatedPlan.partiallyEvaluatedPathEdges.length;
-    i++
-  ) {
-    const e = partiallyEvaluatedPlan.partiallyEvaluatedPathEdges[i];
-    const srcID = nodeIDs[e.srcOffset + i];
-    const dstID = nodeIDs[e.dstOffset + i];
-    let properties: Array<[string, Value]> = e.properties.map(([k, v]) => {
-      return [k, v(match)];
-    });
-    if (e.name !== null) {
-      const element = match.get(e.name);
-      if (!element) {
-        const edgeID = state.createEdgeID();
-        mutation.createEdge(edgeID, srcID, dstID, e.labels, properties);
-        match = match.set(e.name, edgeRefValue(edgeID));
-        continue;
-      }
-      const edgeRef = tryCastEdgeRef(element);
-      if (edgeRef === undefined) {
-        throw new Error(`variable ${JSON.stringify(e.name)} is not a edge`);
-      }
-    }
-    const edgeID = state.createEdgeID();
-    mutation.createEdge(edgeID, srcID, dstID, e.labels, properties);
-  }
-  return match;
-}
-
-function makeCreatePlan(path: Path): CreatePlan {
-  return {
-    pathNodes: path.nodes.map(planCreateNode),
-    pathEdges: path.edges.map(planCreateEdge),
-  };
-}
-
-function planCreate(create: Create): Stage {
-  for (const e of create.path.edges) {
-    if (e.direction === 'NONE') {
-      throw new Error('Edges must specify a direction in create clauses');
-    }
-  }
-  const createPlan = makeCreatePlan(create.path);
-  return {
-    stageName: () => 'create',
-    stageChildren: () => [],
-    stageData: () => formatPath(create.path),
-    execute(state: State): void {
-      const partiallyEvaluated = partiallyEvaluateCreate(
-        createPlan,
-        state.graph,
-        state.queryStats,
-        state.functions,
-      );
-      state.graph = state.graph.withMutations((mutation) => {
-        state.matches = state.matches.map((match) => {
-          return createPerMatch(match, partiallyEvaluated, state, mutation);
-        });
-      });
     },
   };
 }
@@ -1531,10 +839,6 @@ function planUpdate(update: UpdateClause): Stage {
   }
 }
 
-type FunctionPlan = (args: Value[], variables: Match) => Value;
-
-type Func = (graph: Graph<Value>, queryStats: QueryStatsState) => FunctionPlan;
-
 function makeNodeOrEdgeFunc(f: (a: Node<Value> | Edge<Value>) => Value): Func {
   return (graph: Graph<Value>, queryStats: QueryStatsState) => {
     return (args: Value[], variables: Match) => {
@@ -1567,92 +871,6 @@ const funcLabels: Func = makeNodeOrEdgeFunc(
   (x: Node<Value> | Edge<Value>): Value =>
     listValue([...x.labels].map(stringValue)),
 );
-
-type EvaluatePlan = (
-  graph: Graph<Value>,
-  queryStats: QueryStatsState,
-  functions: Map<string, Func>,
-) => (variables: Match) => Value;
-
-function planEvaluate(expression: Expression): EvaluatePlan {
-  if (expression.kind === 'string') {
-    const v = stringValue(expression.value);
-    return () => () => v;
-  } else if (expression.kind === 'number') {
-    const v = numberValue(expression.value);
-    return () => () => v;
-  } else if (expression.kind === 'identifier') {
-    return (graph: Graph<Value>) => (variables: Match) => {
-      const v = variables.get(expression.value);
-      if (!v) {
-        throw new Error(
-          `Variable ${JSON.stringify(expression.value)} not found`,
-        );
-      }
-      return v;
-    };
-  } else if (expression.kind === 'not') {
-    const inner = planEvaluate(expression.value);
-    return (
-      graph: Graph<Value>,
-      queryStats: QueryStatsState,
-      functions: Map<string, Func>,
-    ) => {
-      const evaluate = inner(graph, queryStats, functions);
-      return (variables: Match) => {
-        // TODO: test
-        const b = tryCastBoolean(evaluate(variables));
-        if (b === undefined) {
-          throw new Error(
-            `Expression is not a boolean: ${JSON.stringify(expression.value)}`,
-          );
-        }
-        return booleanValue(!b);
-      };
-    };
-  } else if (expression.kind === 'path') {
-    // TODO: test
-    const steps = matchSteps(expression.value, false);
-    // TODO: choose better
-    const initializer = new ScanGraph();
-    return (graph: Graph<Value>, queryStats: QueryStatsState) =>
-      (variables: Match) => {
-        const matches = expandMatch(
-          initializer,
-          steps,
-          variables,
-          graph,
-          queryStats,
-        );
-        const foundMatch = !matches.next().done;
-        return booleanValue(foundMatch);
-      };
-  } else if (expression.kind === 'functionCall') {
-    const plans = expression.args.map(planEvaluate);
-    return (
-      graph: Graph<Value>,
-      queryStats: QueryStatsState,
-      functions: Map<string, Func>,
-    ) => {
-      const func = functions.get(expression.name);
-      if (!func) {
-        throw new Error(`Unrecognized function: ${expression.name}`);
-      }
-      const funcEvaluate = func(graph, queryStats);
-      const argsEvaluate = plans.map((arg: EvaluatePlan) =>
-        arg(graph, queryStats, functions),
-      );
-      return (variables: Match) => {
-        const argValues = argsEvaluate.map((arg: (m: Match) => Value) =>
-          arg(variables),
-        );
-        return funcEvaluate(argValues, variables);
-      };
-    };
-  } else {
-    throw new Error(`Unrecognized expression: ${JSON.stringify(expression)}`);
-  }
-}
 
 function planReturn(returnClause: ReturnClause): Stage {
   const expressions = returnClause.values.map(planEvaluate);
