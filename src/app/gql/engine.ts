@@ -17,7 +17,6 @@
 import { planCreate } from './engine-create';
 import {
   edgeMatches,
-  expandMatch,
   Func,
   Match,
   MatchInitializer,
@@ -25,6 +24,7 @@ import {
   matchSteps,
   PathMatch,
   planEvaluate,
+  prepareExpandMatch,
   QueryPlanStage,
   QueryPlanStageData,
   QueryStatsState,
@@ -172,11 +172,11 @@ function joinMatches(left: Match[], right: Match[]): Match[] {
 }
 
 interface Stagelet extends QueryPlanStage {
-  execute(
-    matches: Match[],
-    graph: Graph<Value>,
-    queryStats: QueryStatsState,
-  ): Match[];
+  prepare(graph: Graph<Value>, queryStats: QueryStatsState): PreparedStagelet;
+}
+
+interface PreparedStagelet {
+  execute(matches: Match): Match[];
 }
 
 interface FilterStage extends QueryPlanStage {
@@ -283,32 +283,34 @@ class MoveHeadToVariable extends MatchInitializer {
     return quoteIdentifier(this.variableName);
   }
 
-  override *initial(
-    match: Match,
+  override prepareInitial(
     graph: Graph<Value>,
-  ): IterableIterator<PathMatch> {
-    const value = match.get(this.variableName);
-    if (value === undefined) {
-      throw new Error(`Variable ${this.variableName} not defined`);
-    }
-    const nodeID = checkCastNodeRef(value);
-    if (nodeID === undefined) {
-      throw new Error(
-        `Variable ${this.variableName} is not a node (${JSON.stringify(value)})`,
-      );
-    }
-    const node = graph.getNodeByID(nodeID);
-    if (node === undefined) {
-      throw new Error(
-        `Node ${nodeID} (from variable ${this.variableName}) not found`,
-      );
-    }
-    yield {
-      match,
-      head: node,
-      // This won't work once we use this class within the same graph pattern, i.e. multiple
-      // paths within the same MATCH.
-      traversedEdges: new Set(),
+  ): (match: Match) => IterableIterator<PathMatch> {
+    const self = this;
+    return function* (match: Match) {
+      const value = match.get(self.variableName);
+      if (value === undefined) {
+        throw new Error(`Variable ${self.variableName} not defined`);
+      }
+      const nodeID = checkCastNodeRef(value);
+      if (nodeID === undefined) {
+        throw new Error(
+          `Variable ${self.variableName} is not a node (${JSON.stringify(value)})`,
+        );
+      }
+      const node = graph.getNodeByID(nodeID);
+      if (node === undefined) {
+        throw new Error(
+          `Node ${nodeID} (from variable ${self.variableName}) not found`,
+        );
+      }
+      yield {
+        match,
+        head: node,
+        // This won't work once we use this class within the same graph pattern, i.e. multiple
+        // paths within the same MATCH.
+        traversedEdges: new Set(),
+      };
     };
   }
 }
@@ -330,20 +332,21 @@ class MoveHeadToID extends MatchInitializer {
     return quoteIdentifier(this.id);
   }
 
-  override *initial(
-    match: Match,
+  override prepareInitial(
     graph: Graph<Value>,
-  ): IterableIterator<PathMatch> {
+  ): (match: Match) => IterableIterator<PathMatch> {
     const node = graph.getNodeByID(this.id);
     if (node === undefined) {
       throw new Error(`Node ${this.id} not found`);
     }
-    yield {
-      match,
-      head: node,
-      // This won't work once we use this class within the same graph pattern, i.e. multiple
-      // paths within the same MATCH.
-      traversedEdges: new Set(),
+    return function* (match: Match) {
+      yield {
+        match,
+        head: node,
+        // This won't work once we use this class within the same graph pattern, i.e. multiple
+        // paths within the same MATCH.
+        traversedEdges: new Set(),
+      };
     };
   }
 }
@@ -409,12 +412,16 @@ function reversePath(path: Path): Path {
 function filterMatches(filter: FilterStage): Stagelet {
   return {
     ...filter,
-    execute(
-      matches: Match[],
+    prepare(
       graph: Graph<Value>,
       queryStats: QueryStatsState,
-    ): Match[] {
-      return matches.filter(filter.execute(graph, queryStats));
+    ): PreparedStagelet {
+      const matchFilter = filter.execute(graph, queryStats);
+      return {
+        execute(match: Match): Match[] {
+          return matchFilter(match) ? [match] : [];
+        },
+      };
     },
   };
 }
@@ -542,15 +549,14 @@ function filterByPathExistence(path: Path): FilterStage {
       graph: Graph<Value>,
       queryStats: QueryStatsState,
     ): (match: Match) => boolean {
+      const expandMatch = prepareExpandMatch(
+        initializer,
+        steps,
+        graph,
+        queryStats,
+      );
       return (match) => {
-        const expanded = expandMatch(
-          initializer,
-          steps,
-          match,
-          graph,
-          queryStats,
-        );
-        return !expanded.next().done;
+        return !expandMatch(match).next().done;
       };
     },
   };
@@ -594,37 +600,58 @@ function planReadPath(path: Path, allowNewVariables: boolean): Stagelet {
       return [initializer, ...steps];
     },
     stageData: () => null,
-    execute(
-      stateMatches: Match[],
+    prepare(
       graph: Graph<Value>,
       queryStats: QueryStatsState,
-    ): Match[] {
-      const matches: Match[] = [];
-      for (const match of stateMatches) {
-        matches.push(
-          ...expandMatch(initializer, steps, match, graph, queryStats),
-        );
-      }
-      return matches;
+    ): PreparedStagelet {
+      const expandMatch = prepareExpandMatch(
+        initializer,
+        steps,
+        graph,
+        queryStats,
+      );
+      return {
+        execute(match: Match): Match[] {
+          return [...expandMatch(match)];
+        },
+      };
     },
   };
 }
 
-function planRead(read: ReadClause): Stage {
-  const stages = read.paths.map((p) => planReadPath(p, true));
-  if (read.where) {
-    stages.push(filterMatches(filterByExpression(read.where)));
+interface ReadPlan {
+  stages: Stagelet[];
+}
+
+interface PreparedReadPlan {
+  stages: PreparedStagelet[];
+}
+
+function makeReadPlan(paths: Path[], where: Expression | null): ReadPlan {
+  const stages = paths.map((p) => planReadPath(p, true));
+  if (where) {
+    stages.push(filterMatches(filterByExpression(where)));
   }
+  return { stages };
+}
+
+function planRead(read: ReadClause): Stage {
+  const plan = makeReadPlan(read.paths, read.where);
   return {
     stageName: () => 'read',
     stageChildren(): QueryPlanStage[] {
-      return stages;
+      return plan.stages;
     },
     stageData: () => null,
     execute(state: State): void {
       let matches = state.matches;
-      for (const stage of stages) {
-        matches = stage.execute(matches, state.graph, state.queryStats);
+      for (const stage of plan.stages) {
+        const preparedStage = stage.prepare(state.graph, state.queryStats);
+        const newMatches: Match[] = [];
+        for (const match of matches) {
+          newMatches.push(...preparedStage.execute(match));
+        }
+        matches = newMatches;
       }
       state.matches = matches;
     },

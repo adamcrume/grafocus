@@ -144,10 +144,7 @@ function labelsMatch(
   }
 }
 
-function valueMatches(
-  value: Value | undefined,
-  pattern: Expression,
-): boolean {
+function valueMatches(value: Value | undefined, pattern: Expression): boolean {
   if (pattern.kind === 'functionCall') {
     throw new Error(`Matching properties with function is not yet implemented`);
   }
@@ -215,10 +212,9 @@ export abstract class MatchInitializer implements QueryPlanStage {
   abstract stageName(): string;
   abstract stageChildren(): QueryPlanStage[];
   abstract stageData(): QueryPlanStageData;
-  abstract initial(
-    match: Match,
+  abstract prepareInitial(
     graph: Graph<Value>,
-  ): IterableIterator<PathMatch>;
+  ): (match: Match) => IterableIterator<PathMatch>;
 }
 
 export class ScanGraph extends MatchInitializer {
@@ -238,17 +234,18 @@ export class ScanGraph extends MatchInitializer {
     return null;
   }
 
-  override *initial(
-    match: Match,
+  override prepareInitial(
     graph: Graph<Value>,
-  ): IterableIterator<PathMatch> {
-    for (const startNode of graph.nodes) {
-      yield {
-        match,
-        head: startNode,
-        traversedEdges: new Set(),
-      };
-    }
+  ): (match: Match) => IterableIterator<PathMatch> {
+    return function* (match: Match) {
+      for (const startNode of graph.nodes) {
+        yield {
+          match,
+          head: startNode,
+          traversedEdges: new Set(),
+        };
+      }
+    };
   }
 }
 
@@ -511,40 +508,43 @@ export function matchSteps(
   return steps;
 }
 
-export function* expandMatch(
+// TODO: Should this take an Iterator<Match> as input?
+export function prepareExpandMatch(
   initializer: MatchInitializer,
   steps: MatchStep[],
-  match: Match,
   graph: Graph<Value>,
   queryStats: QueryStatsState,
-): IterableIterator<Match> {
+): (match: Match) => IterableIterator<Match> {
   interface Submatch {
     pathMatch: PathMatch;
     step: number;
   }
-  let submatchIters = [
-    iter(initializer.initial(match, graph)).map((p) => ({
-      pathMatch: p,
-      step: 0,
-    })),
-  ];
-  while (true) {
-    const submatches = submatchIters.pop();
-    if (!submatches) {
-      return;
-    }
-    for (const submatch of submatches) {
-      if (submatch.step == steps.length) {
-        yield submatch.pathMatch.match;
-      } else {
-        submatchIters.push(
-          iter(
-            steps[submatch.step].match(graph, submatch.pathMatch, queryStats),
-          ).map((p) => ({ pathMatch: p, step: submatch.step + 1 })),
-        );
+  const preparedInitializer = initializer.prepareInitial(graph);
+  return function* (match: Match) {
+    let submatchIters = [
+      iter(preparedInitializer(match)).map((p) => ({
+        pathMatch: p,
+        step: 0,
+      })),
+    ];
+    while (true) {
+      const submatches = submatchIters.pop();
+      if (!submatches) {
+        return;
+      }
+      for (const submatch of submatches) {
+        if (submatch.step == steps.length) {
+          yield submatch.pathMatch.match;
+        } else {
+          submatchIters.push(
+            iter(
+              steps[submatch.step].match(graph, submatch.pathMatch, queryStats),
+            ).map((p) => ({ pathMatch: p, step: submatch.step + 1 })),
+          );
+        }
       }
     }
-  }
+  };
 }
 
 type FunctionPlan = (args: Value[], variables: Match) => Value;
@@ -601,18 +601,19 @@ export function planEvaluate(expression: Expression): EvaluatePlan {
     const steps = matchSteps(expression.value, false);
     // TODO: choose better
     const initializer = new ScanGraph();
-    return (graph: Graph<Value>, queryStats: QueryStatsState) =>
-      (variables: Match) => {
-        const matches = expandMatch(
-          initializer,
-          steps,
-          variables,
-          graph,
-          queryStats,
-        );
+    return (graph: Graph<Value>, queryStats: QueryStatsState) => {
+      const expandMatch = prepareExpandMatch(
+        initializer,
+        steps,
+        graph,
+        queryStats,
+      );
+      return (variables: Match) => {
+        const matches = expandMatch(variables);
         const foundMatch = !matches.next().done;
         return booleanValue(foundMatch);
       };
+    };
   } else if (expression.kind === 'functionCall') {
     const plans = expression.args.map(planEvaluate);
     return (
