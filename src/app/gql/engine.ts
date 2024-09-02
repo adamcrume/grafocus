@@ -45,8 +45,8 @@ import {
   Direction,
   Edge as ASTEdge,
   Expression,
-  Delete,
   Node as ASTNode,
+  Delete,
   Path,
   Query as ASTQuery,
   ReadClause,
@@ -176,7 +176,7 @@ interface Stagelet extends QueryPlanStage {
 }
 
 interface PreparedStagelet {
-  execute(matches: Match): Match[];
+  execute(matches: Match): IterableIterator<Match>;
 }
 
 interface FilterStage extends QueryPlanStage {
@@ -418,8 +418,12 @@ function filterMatches(filter: FilterStage): Stagelet {
     ): PreparedStagelet {
       const matchFilter = filter.execute(graph, queryStats);
       return {
-        execute(match: Match): Match[] {
-          return matchFilter(match) ? [match] : [];
+        execute(match: Match): IterableIterator<Match> {
+          return (function* () {
+            if (matchFilter(match)) {
+              yield match;
+            }
+          })();
         },
       };
     },
@@ -611,8 +615,8 @@ function planReadPath(path: Path, allowNewVariables: boolean): Stagelet {
         queryStats,
       );
       return {
-        execute(match: Match): Match[] {
-          return [...expandMatch(match)];
+        execute(match: Match): IterableIterator<Match> {
+          return expandMatch(match);
         },
       };
     },
