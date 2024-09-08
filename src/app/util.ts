@@ -20,3 +20,7 @@ export function parseClasses(classes: string): string[] {
     .map((c) => c.trim())
     .filter((c) => c !== '');
 }
+
+export function checkExhaustive(v: never): never {
+  throw new Error(`Unexpected value: ${v}`);
+}

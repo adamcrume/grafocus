@@ -20,6 +20,7 @@ import {
   BooleanType,
   EDGE_REF,
   EdgeRefType,
+  listOf,
   ListType,
   NODE_REF,
   NodeRefType,
@@ -266,10 +267,8 @@ export function listValue(values: Value[]): List {
     };
   } else {
     return {
-      type: {
-        kind: 'list',
-        inner: values[0].type,
-      },
+      // TODO: Support heterogenous lists
+      type: listOf(values[0].type),
       value: values,
     };
   }
