@@ -107,7 +107,7 @@ export function cloneValue(value: Value): Value {
   }
 }
 
-export function booleanValue(value: boolean): Value {
+export function booleanValue(value: boolean): BooleanValue {
   if (value) {
     return TRUE;
   } else {
@@ -115,21 +115,29 @@ export function booleanValue(value: boolean): Value {
   }
 }
 
-export function numberValue(value: number): Value {
+export function numberValue(value: number): NumberValue {
   return {
     type: NUMBER,
     value,
   };
 }
 
-export function stringValue(value: string): Value {
+export function stringValue(value: string): StringValue {
   return {
     type: STRING,
     value,
   };
 }
 
-export function primitiveValue(value: boolean | number | string): Value {
+export function primitiveValue(value: boolean): BooleanValue;
+export function primitiveValue(value: number): NumberValue;
+export function primitiveValue(value: string): StringValue;
+export function primitiveValue(
+  value: boolean | number | string,
+): BooleanValue | NumberValue | StringValue;
+export function primitiveValue(
+  value: boolean | number | string,
+): BooleanValue | NumberValue | StringValue {
   if (typeof value === 'boolean') {
     return booleanValue(value);
   } else if (typeof value === 'number') {
@@ -139,21 +147,21 @@ export function primitiveValue(value: boolean | number | string): Value {
   }
 }
 
-export function nodeRefValue(value: string): Value {
+export function nodeRefValue(value: string): NodeRef {
   return {
     type: NODE_REF,
     value,
   };
 }
 
-export function edgeRefValue(value: string): Value {
+export function edgeRefValue(value: string): EdgeRef {
   return {
     type: EDGE_REF,
     value,
   };
 }
 
-export function numberList(values: number[]): Value {
+export function numberList(values: number[]): List {
   return {
     type: NUMBER_LIST,
     value: values.map(primitiveValue),
@@ -250,7 +258,7 @@ export function checkCastEdgeRef(value: Value | undefined): string | undefined {
   throw new Error(`${JSON.stringify(value)} is not a edge ref`);
 }
 
-export function listValue(values: Value[]): Value {
+export function listValue(values: Value[]): List {
   if (values.length === 0) {
     return {
       type: ANY_LIST,
