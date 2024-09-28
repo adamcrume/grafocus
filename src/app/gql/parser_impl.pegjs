@@ -35,10 +35,18 @@ sp "space" = [\u0009-\u000D\u001C-\u0020\u1680\u2000-\u200A\u2028\u2029\u202F\u2
 
 query = regularQuery
 
-regularQuery = s:singleQuery {
+union = "union"i sp all:"all"i? sp s:singleQuery {
+  return {
+    all: !!all,
+    singleQuery: s,
+  }
+}
+
+regularQuery = s:singleQuery unions:(sp @union)* {
   return {
     kind: 'regularQuery',
     singleQuery: s,
+    unions,
   }
 }
 

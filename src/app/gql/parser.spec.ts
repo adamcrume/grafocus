@@ -125,7 +125,84 @@ describe('cypher', () => {
             },
           ],
         }),
+        unions: [],
       });
+    });
+
+    it('parses union', () => {
+      expect(parseQuery('match (a) return a union match (b) return b')).toEqual(
+        jasmine.objectContaining({
+          kind: 'regularQuery',
+          singleQuery: jasmine.objectContaining({
+            reads: [jasmine.any(Object)],
+            returnClause: jasmine.any(Object),
+          }),
+          unions: [
+            {
+              all: false,
+              singleQuery: jasmine.objectContaining({
+                reads: [jasmine.any(Object)],
+                returnClause: jasmine.any(Object),
+              }),
+            },
+          ],
+        }),
+      );
+    });
+
+    it('parses union all', () => {
+      expect(
+        parseQuery('match (a) return a union all match (b) return b'),
+      ).toEqual(
+        jasmine.objectContaining({
+          kind: 'regularQuery',
+          singleQuery: jasmine.objectContaining({
+            reads: [jasmine.any(Object)],
+            returnClause: jasmine.any(Object),
+          }),
+          unions: [
+            {
+              all: true,
+              singleQuery: jasmine.objectContaining({
+                reads: [jasmine.any(Object)],
+                returnClause: jasmine.any(Object),
+              }),
+            },
+          ],
+        }),
+      );
+    });
+
+    it('parses union multiple', () => {
+      expect(
+        parseQuery(
+          'match (a) return a union match (b) return b union match (c) return c',
+        ),
+      ).toEqual(
+        jasmine.objectContaining({
+          kind: 'regularQuery',
+          singleQuery: jasmine.objectContaining({
+            reads: [jasmine.any(Object)],
+            returnClause: jasmine.any(Object),
+          }),
+          unions: [
+            {
+              all: false,
+              singleQuery: jasmine.objectContaining({
+                reads: [jasmine.any(Object)],
+                returnClause: jasmine.any(Object),
+              }),
+            },
+            {
+              all: false,
+              singleQuery: jasmine.objectContaining({
+                reads: [jasmine.any(Object)],
+                returnClause: jasmine.any(Object),
+              }),
+            },
+          ],
+        }),
+      );
     });
   });
 

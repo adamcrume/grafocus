@@ -20,9 +20,15 @@ import * as parser from './parser_impl';
 
 export type Query = RegularQuery;
 
+export interface Union {
+  all: boolean;
+  singleQuery: SingleQuery;
+}
+
 export interface RegularQuery {
   kind: 'regularQuery';
   singleQuery: SingleQuery;
+  unions: Union[];
 }
 
 export type SingleQuery = SinglePartQuery;
