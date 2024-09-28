@@ -983,14 +983,14 @@ export interface QueryOptions {
 
 export function planQuery(query: ASTQuery, options?: QueryOptions): QueryPlan {
   const stages: Array<Stage> = [];
-  for (const read of query.reads) {
+  for (const read of query.singleQuery.reads) {
     stages.push(planRead(read));
   }
-  for (const update of query.updates) {
+  for (const update of query.singleQuery.updates) {
     stages.push(planUpdate(update));
   }
-  if (query.returnClause) {
-    stages.push(planReturn(query.returnClause));
+  if (query.singleQuery.returnClause) {
+    stages.push(planReturn(query.singleQuery.returnClause));
   }
   let nextNodeID = 0;
   let nextEdgeID = 0;

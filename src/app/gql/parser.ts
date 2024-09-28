@@ -18,7 +18,16 @@
 
 import * as parser from './parser_impl';
 
-export interface Query {
+export type Query = RegularQuery;
+
+export interface RegularQuery {
+  kind: 'regularQuery';
+  singleQuery: SingleQuery;
+}
+
+export type SingleQuery = SinglePartQuery;
+
+export interface SinglePartQuery {
   reads: ReadClause[];
   updates: UpdateClause[];
   returnClause: ReturnClause | undefined;

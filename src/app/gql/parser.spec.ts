@@ -29,68 +29,73 @@ describe('cypher', () => {
         parseQuery('match (a)--(b)-[x]->(c)\ndetach delete x\ndelete y'),
       ).toEqual(
         jasmine.objectContaining({
-          reads: [
-            {
-              kind: 'match',
-              paths: [
-                {
-                  nodes: [
-                    {
-                      name: 'a',
-                      label: null,
-                      properties: null,
-                    },
-                    {
-                      name: 'b',
-                      label: null,
-                      properties: null,
-                    },
-                    {
-                      name: 'c',
-                      label: null,
-                      properties: null,
-                    },
-                  ],
-                  edges: [
-                    {
-                      name: null,
-                      direction: 'NONE',
-                      label: null,
-                      properties: null,
-                      quantifier: null,
-                    },
-                    {
-                      name: 'x',
-                      direction: 'RIGHT',
-                      label: null,
-                      properties: null,
-                      quantifier: null,
-                    },
-                  ],
-                },
-              ],
-              where: null,
-            },
-          ],
-          updates: [
-            {
-              kind: 'delete',
-              detach: true,
-              name: 'x',
-            },
-            {
-              kind: 'delete',
-              detach: false,
-              name: 'y',
-            },
-          ],
+          kind: 'regularQuery',
+          singleQuery: {
+            reads: [
+              {
+                kind: 'match',
+                paths: [
+                  {
+                    nodes: [
+                      {
+                        name: 'a',
+                        label: null,
+                        properties: null,
+                      },
+                      {
+                        name: 'b',
+                        label: null,
+                        properties: null,
+                      },
+                      {
+                        name: 'c',
+                        label: null,
+                        properties: null,
+                      },
+                    ],
+                    edges: [
+                      {
+                        name: null,
+                        direction: 'NONE',
+                        label: null,
+                        properties: null,
+                        quantifier: null,
+                      },
+                      {
+                        name: 'x',
+                        direction: 'RIGHT',
+                        label: null,
+                        properties: null,
+                        quantifier: null,
+                      },
+                    ],
+                  },
+                ],
+                where: null,
+              },
+            ],
+            updates: [
+              {
+                kind: 'delete',
+                detach: true,
+                name: 'x',
+              },
+              {
+                kind: 'delete',
+                detach: false,
+                name: 'y',
+              },
+            ],
+            returnClause: null,
+          },
         }),
       );
     });
 
     it('parses a match with multiple paths', () => {
-      expect(parseQuery('match (a), (b) return a, b')).toEqual(
-        jasmine.objectContaining({
+      expect(parseQuery('match (a), (b) return a, b')).toEqual({
+        kind: 'regularQuery',
+        singleQuery: jasmine.objectContaining({
           reads: [
             {
               kind: 'match',
@@ -120,7 +125,7 @@ describe('cypher', () => {
             },
           ],
         }),
-      );
+      });
     });
   });
 

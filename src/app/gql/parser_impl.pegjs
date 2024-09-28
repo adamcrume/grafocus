@@ -33,7 +33,18 @@ quotedIdentifier = "`" chars:(
 
 sp "space" = [\u0009-\u000D\u001C-\u0020\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]*
 
-query = reads:readClause|.., sp| sp tail:(
+query = regularQuery
+
+regularQuery = s:singleQuery {
+  return {
+    kind: 'regularQuery',
+    singleQuery: s,
+  }
+}
+
+singleQuery = singlePartQuery
+
+singlePartQuery = reads:readClause|.., sp| sp tail:(
   r:return {return {updates: [], returnClause:r};} /
   u:updateClause|1.., sp| sp r:return? {return {updates:u, returnClause:r};}
   ) {
