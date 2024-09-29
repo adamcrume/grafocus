@@ -274,15 +274,31 @@ export function listValue(values: Value[]): List {
   }
 }
 
-export function serializeValue(value: Value): any {
+export type SerializedNodeRef = NodeRef;
+export type SerializedEdgeRef = EdgeRef;
+export type SerializedValue =
+  | boolean
+  | string
+  | number
+  | SerializedNodeRef
+  | SerializedEdgeRef
+  | SerializedValue[];
+
+export function serializeValue(value: Value): SerializedValue {
   const kind = value.type.kind;
   if (kind === 'boolean' || kind === 'string' || kind === 'number') {
-    return value.value;
+    return (value as BooleanValue | StringValue | NumberValue).value;
+  }
+  if (kind === 'node_ref') {
+    return value as NodeRef;
+  }
+  if (kind === 'edge_ref') {
+    return value as EdgeRef;
   }
   if (isList(value)) {
     return value.value.map(serializeValue);
   }
-  return value;
+  throw new Error(`Unrecognized type: ${JSON.stringify(value.type)}`);
 }
 
 export function deserializeValue(value: any): Value {
@@ -294,6 +310,12 @@ export function deserializeValue(value: any): Value {
   }
   if (typeof value === 'number') {
     return numberValue(value);
+  }
+  if (value.type?.kind === 'node_ref' && typeof value.value === 'string') {
+    return value;
+  }
+  if (value.type?.kind === 'edge_ref' && typeof value.value === 'string') {
+    return value;
   }
   if (Array.isArray(value)) {
     return listValue(value.map(deserializeValue));
