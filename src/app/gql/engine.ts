@@ -71,6 +71,7 @@ import {
   tryCastEdgeRef,
   tryCastNodeRef,
   Value,
+  ValueArraySet,
 } from './values';
 
 export interface QueryStats {
@@ -1002,6 +1003,62 @@ function planSingleQuery(singleQuery: SingleQuery): Stage {
   return planSequence(stages);
 }
 
+function planUnionAll(stages: Stage[]): Stage {
+  return {
+    stageName: () => 'union_all',
+    stageChildren: () => stages,
+    stageData: () => null,
+    execute(state: State) {
+      const result: Value[][] = [];
+      for (const stage of stages) {
+        state.returnValue = undefined;
+        stage.execute(state);
+        const data = state.returnValue;
+        if (!data) {
+          throw new Error(
+            'Internal error: UNION subquery did not set return value',
+          );
+        }
+        // There's some weird bug here.  If we inline tmp, we get:
+        //   Type 'never' must have a '[Symbol.iterator]()' method that returns an iterator
+        // This happens even if we explicitly give data the type Value[][]|undefined.
+        const tmp: Value[][] = data;
+        result.push(...tmp);
+      }
+      state.returnValue = result;
+    },
+  };
+}
+
+function planUnionDistinct(stages: Stage[]): Stage {
+  return {
+    stageName: () => 'union_distinct',
+    stageChildren: () => stages,
+    stageData: () => null,
+    execute(state: State) {
+      const result = new ValueArraySet();
+      for (const stage of stages) {
+        state.returnValue = undefined;
+        stage.execute(state);
+        const data = state.returnValue;
+        if (!data) {
+          throw new Error(
+            'Internal error: UNION subquery did not set return value',
+          );
+        }
+        // There's some weird bug here.  If we inline tmp, we get:
+        //   Type 'never' must have a '[Symbol.iterator]()' method that returns an iterator
+        // This happens even if we explicitly give data the type Value[][]|undefined.
+        const tmp: Value[][] = data;
+        for (const row of tmp) {
+          result.add(row);
+        }
+      }
+      state.returnValue = [...result];
+    },
+  };
+}
+
 const DEFAULT_MAX_NODE_VISITS = 1000;
 
 export interface QueryOptions {
@@ -1010,6 +1067,21 @@ export interface QueryOptions {
 
 export function planQuery(query: ASTQuery, options?: QueryOptions): QueryPlan {
   let root = planSingleQuery(query.singleQuery);
+  if (query.unions.length) {
+    const all = query.unions[0].all;
+    if (query.unions.some((u) => u.all !== all)) {
+      throw new Error('Mixing UNION and UNION ALL is not allowed');
+    }
+    const parts = [root];
+    for (const union of query.unions) {
+      parts.push(planSingleQuery(union.singleQuery));
+    }
+    if (all) {
+      root = planUnionAll(parts);
+    } else {
+      root = planUnionDistinct(parts);
+    }
+  }
   let nextNodeID = 0;
   let nextEdgeID = 0;
   let nodesVisited = 0;

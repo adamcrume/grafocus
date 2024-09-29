@@ -878,6 +878,48 @@ describe('execute', () => {
     expect(data).toEqual([[''], ['bar,baz'], ['foo']]);
   });
 
+  it('can union all', () => {
+    const { data } = executeQuery(
+      'match (a:foo) return a union all match (b:bar) return b',
+      newGraph()
+        .createNode('n1', ['foo'])
+        .createNode('n2', ['bar'])
+        .createNode('n3', ['baz']),
+    );
+    expect(data).toEqual([['n1'], ['n2']]);
+  });
+
+  it('can union distinct', () => {
+    const { data } = executeQuery(
+      'match (a:foo) return a union match (b:bar) return b',
+      newGraph()
+        .createNode('n1', ['foo', 'bar'])
+        .createNode('n2', ['bar'])
+        .createNode('n3', ['baz']),
+    );
+    expect(data).toEqual([['n1'], ['n2']]);
+  });
+
+  it('can union all multiple', () => {
+    const { data } = executeQuery(
+      'match (a:foo) return a union all match (b:bar) return b union all match (c:baz) return c',
+      newGraph()
+        .createNode('n1', ['foo'])
+        .createNode('n2', ['bar'])
+        .createNode('n3', ['baz']),
+    );
+    expect(data).toEqual([['n1'], ['n2'], ['n3']]);
+  });
+
+  it('rejects union and union all', () => {
+    expect(() => {
+      executeQuery(
+        'match (a) return a union all match (b) return b union match (c) return c',
+        newGraph(),
+      );
+    }).toThrowError(/not allowed/);
+  });
+
   describe('merge', () => {
     it('can insert into an empty graph', () => {
       const { graph, data } = executeQuery(

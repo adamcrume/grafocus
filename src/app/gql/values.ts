@@ -300,3 +300,16 @@ export function deserializeValue(value: any): Value {
   }
   throw new Error(`Unrecognized type: ${JSON.stringify(value)}`);
 }
+
+export class ValueArraySet {
+  private values = new Map<string, Value[]>();
+
+  add(values: Value[]): this {
+    this.values.set(JSON.stringify(values.map(serializeValue)), values);
+    return this;
+  }
+
+  [Symbol.iterator](): IterableIterator<Value[]> {
+    return this.values.values();
+  }
+}
