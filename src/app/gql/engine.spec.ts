@@ -111,11 +111,12 @@ describe('describeQueryPlan', () => {
   it('can describe query', () => {
     const plan = planQuery(parseQuery('match (x) delete x'));
     expect(describeQueryPlan(plan)).toEqual(
-      `read
-  read_path
-    scan_graph
-    match_node: name=x
-delete: x
+      `sequential
+  read
+    read_path
+      scan_graph
+      match_node: name=x
+  delete: x
 `,
     );
   });
@@ -127,15 +128,16 @@ delete: x
       ),
     );
     expect(describeQueryPlan(plan)).toEqual(
-      `read
-  read_path
-    scan_graph
-    match_node: name=n1
-    match_edge: name=e1
-    match_node
-    match_edge: name=e2, direction=RIGHT, label=Foo, properties={bar: 1}
-    match_node: name=n3, label=Bar, properties={baz: 1}
-return: n1, n3
+      `sequential
+  read
+    read_path
+      scan_graph
+      match_node: name=n1
+      match_edge: name=e1
+      match_node
+      match_edge: name=e2, direction=RIGHT, label=Foo, properties={bar: 1}
+      match_node: name=n3, label=Bar, properties={baz: 1}
+  return: n1, n3
 `,
     );
   });
@@ -145,18 +147,19 @@ return: n1, n3
       parseQuery('match (x) where ()-->(x)-->() return x'),
     );
     expect(describeQueryPlan(plan)).toEqual(
-      `read
-  read_path
-    scan_graph
-    match_node: name=x
-  match_path_existence
-    scan_graph
-    match_node
-    match_edge: direction=RIGHT
-    match_node: name=x
-    match_edge: direction=RIGHT
-    match_node
-return: x
+      `sequential
+  read
+    read_path
+      scan_graph
+      match_node: name=x
+    match_path_existence
+      scan_graph
+      match_node
+      match_edge: direction=RIGHT
+      match_node: name=x
+      match_edge: direction=RIGHT
+      match_node
+  return: x
 `,
     );
   });
@@ -166,18 +169,19 @@ return: x
       parseQuery('match (x) where ({_ID:"y"})-->(x)-->(:Foo) return x'),
     );
     expect(describeQueryPlan(plan)).toEqual(
-      `read
-  read_path
-    scan_graph
-    match_node: name=x
-  match_path_existence
-    move_head_to_id: y
-    match_node: properties={_ID: "y"}
-    match_edge: direction=RIGHT
-    match_node: name=x
-    match_edge: direction=RIGHT
-    match_node: label=Foo
-return: x
+      `sequential
+  read
+    read_path
+      scan_graph
+      match_node: name=x
+    match_path_existence
+      move_head_to_id: y
+      match_node: properties={_ID: "y"}
+      match_edge: direction=RIGHT
+      match_node: name=x
+      match_edge: direction=RIGHT
+      match_node: label=Foo
+  return: x
 `,
     );
   });
@@ -187,18 +191,19 @@ return: x
       parseQuery('match (x) where (:Foo)-->(x)-->({_ID:"y"}) return x'),
     );
     expect(describeQueryPlan(plan)).toEqual(
-      `read
-  read_path
-    scan_graph
-    match_node: name=x
-  match_path_existence
-    move_head_to_id: y
-    match_node: properties={_ID: "y"}
-    match_edge: direction=LEFT
-    match_node: name=x
-    match_edge: direction=LEFT
-    match_node: label=Foo
-return: x
+      `sequential
+  read
+    read_path
+      scan_graph
+      match_node: name=x
+    match_path_existence
+      move_head_to_id: y
+      match_node: properties={_ID: "y"}
+      match_edge: direction=LEFT
+      match_node: name=x
+      match_edge: direction=LEFT
+      match_node: label=Foo
+  return: x
 `,
     );
   });

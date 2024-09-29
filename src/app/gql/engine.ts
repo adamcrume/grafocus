@@ -59,6 +59,7 @@ import {
   ReadClause,
   RemoveClause,
   ReturnClause,
+  SingleQuery,
   SetClause,
   UpdateClause,
 } from './parser';
@@ -85,15 +86,11 @@ export interface ExecuteQueryResult {
 export interface QueryPlan {
   execute(graph: Graph<Value>): ExecuteQueryResult;
 
-  stages(): QueryPlanStage[];
+  root(): QueryPlanStage;
 }
 
 export function describeQueryPlan(plan: QueryPlan): string {
-  let result = '';
-  for (const stage of plan.stages()) {
-    result += describeQueryPlanStage(stage, 0);
-  }
-  return result;
+  return describeQueryPlanStage(plan.root(), 0);
 }
 
 function describeQueryPlanStage(stage: QueryPlanStage, indent: number): string {
@@ -975,6 +972,36 @@ function planReturn(returnClause: ReturnClause): Stage {
   };
 }
 
+function planSequence(stages: Stage[]): Stage {
+  if (stages.length === 1) {
+    return stages[0];
+  }
+  return {
+    stageName: () => 'sequential',
+    stageChildren: () => stages,
+    stageData: () => null,
+    execute(state: State) {
+      for (const stage of stages) {
+        stage.execute(state);
+      }
+    },
+  };
+}
+
+function planSingleQuery(singleQuery: SingleQuery): Stage {
+  const stages: Array<Stage> = [];
+  for (const read of singleQuery.reads) {
+    stages.push(planRead(read));
+  }
+  for (const update of singleQuery.updates) {
+    stages.push(planUpdate(update));
+  }
+  if (singleQuery.returnClause) {
+    stages.push(planReturn(singleQuery.returnClause));
+  }
+  return planSequence(stages);
+}
+
 const DEFAULT_MAX_NODE_VISITS = 1000;
 
 export interface QueryOptions {
@@ -982,24 +1009,13 @@ export interface QueryOptions {
 }
 
 export function planQuery(query: ASTQuery, options?: QueryOptions): QueryPlan {
-  const stages: Array<Stage> = [];
-  for (const read of query.singleQuery.reads) {
-    stages.push(planRead(read));
-  }
-  for (const update of query.singleQuery.updates) {
-    stages.push(planUpdate(update));
-  }
-  if (query.singleQuery.returnClause) {
-    stages.push(planReturn(query.singleQuery.returnClause));
-  }
+  let root = planSingleQuery(query.singleQuery);
   let nextNodeID = 0;
   let nextEdgeID = 0;
   let nodesVisited = 0;
   const maxNodeVisits = options?.maxNodeVisits ?? DEFAULT_MAX_NODE_VISITS;
   return {
-    stages: () => {
-      return stages;
-    },
+    root: () => root,
     execute: (graph: Graph<Value>) => {
       const state = {
         graph,
@@ -1034,9 +1050,7 @@ export function planQuery(query: ASTQuery, options?: QueryOptions): QueryPlan {
         },
         functions: new Map<string, Func>([['labels', funcLabels]]),
       };
-      for (const stage of stages) {
-        stage.execute(state);
-      }
+      root.execute(state);
       return {
         graph: state.graph,
         data: state.returnValue,
