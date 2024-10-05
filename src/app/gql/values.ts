@@ -274,8 +274,16 @@ export function listValue(values: Value[]): List {
   }
 }
 
-export type SerializedNodeRef = NodeRef;
-export type SerializedEdgeRef = EdgeRef;
+export declare interface SerializedNodeRef {
+  type: { kind: 'node_ref' };
+  value: string;
+}
+
+export declare interface SerializedEdgeRef {
+  type: { kind: 'edge_ref' };
+  value: string;
+}
+
 export type SerializedValue =
   | boolean
   | string
@@ -301,7 +309,7 @@ export function serializeValue(value: Value): SerializedValue {
   throw new Error(`Unrecognized type: ${JSON.stringify(value.type)}`);
 }
 
-export function deserializeValue(value: any): Value {
+export function deserializeValue(value: unknown): Value {
   if (typeof value === 'boolean') {
     return booleanValue(value);
   }
@@ -311,11 +319,21 @@ export function deserializeValue(value: any): Value {
   if (typeof value === 'number') {
     return numberValue(value);
   }
-  if (value.type?.kind === 'node_ref' && typeof value.value === 'string') {
-    return value;
-  }
-  if (value.type?.kind === 'edge_ref' && typeof value.value === 'string') {
-    return value;
+  if (typeof value === 'object' && value !== null && 'type' in value) {
+    const type = value.type;
+    if (
+      type &&
+      typeof type === 'object' &&
+      'kind' in type &&
+      'value' in value
+    ) {
+      if (type.kind === 'node_ref' && typeof value.value === 'string') {
+        return { type: NODE_REF, value: value.value };
+      }
+      if (type.kind === 'edge_ref' && typeof value.value === 'string') {
+        return { type: EDGE_REF, value: value.value };
+      }
+    }
   }
   if (Array.isArray(value)) {
     return listValue(value.map(deserializeValue));

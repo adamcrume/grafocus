@@ -850,9 +850,7 @@ export class AppComponent implements OnInit, OnDestroy {
       JSON.stringify(
         {
           data: this.data,
-          graph: this.originalGraph.serialize((v) =>
-            JSON.stringify(serializeValue(v)),
-          ),
+          graph: this.originalGraph.serialize(serializeValue),
           style: this.style,
           transformations: this.transformations.map((t) => ({
             name: t.name,

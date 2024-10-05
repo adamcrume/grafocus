@@ -41,7 +41,7 @@ export interface SerializedGraph {
 
 function serializeProperties<Value>(
   properties: Immutable.Map<string, Value>,
-  serializeValue: (v: Value) => string,
+  serializeValue: (v: Value) => unknown,
 ): SerializedProperties {
   const p: SerializedProperties = {};
   for (const [k, v] of properties) {
@@ -283,7 +283,7 @@ export class Graph<Value> {
     return this._edgesByID.get(id);
   }
 
-  serialize(serializeValue: (v: Value) => string): SerializedGraph {
+  serialize(serializeValue: (v: Value) => unknown): SerializedGraph {
     const nodes = [];
     for (const n of this.nodes) {
       nodes.push({
@@ -310,7 +310,7 @@ export class Graph<Value> {
 
   static deserialize<Value>(
     graph: SerializedGraph,
-    deserializeValue: (s: string) => Value,
+    deserializeValue: (s: unknown) => Value,
   ): Graph<Value> {
     return Graph.new<Value>().withMutations((m) => {
       for (const node of graph.nodes) {
