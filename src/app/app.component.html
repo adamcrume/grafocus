@@ -25,6 +25,9 @@
   </button>
   <span>Graph Explorer - {{title}}</span>
   <span class="spacer"></span>
+  <mat-slide-toggle [(ngModel)]="autoLayoutEnabled">
+    Auto-layout
+  </mat-slide-toggle>
   <button
     mat-icon-button
     aria-label="Lay out"

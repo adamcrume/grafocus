@@ -73,3 +73,10 @@ mat-sidenav-content {
 element-properties {
     width: 100%;
 }
+
+mat-toolbar mat-slide-toggle {
+    @include mat.slide-toggle-overrides((
+        label-text-color: var(--mat-sys-on-primary),
+    ));
+    margin-right: 8px;
+}

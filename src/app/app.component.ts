@@ -456,6 +456,8 @@ export class AppComponent implements OnInit, OnDestroy {
     }
   }
 
+  autoLayoutEnabled = true;
+
   constructor(private dialog: MatDialog) {
     this.transformedGraph = this.transform(this.originalGraph);
     const dataSource =
@@ -542,7 +544,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.cy = cy;
     this.expandCollapseApi = cy.expandCollapse({
       layoutBy: () => {
-        this.layout();
+        this.autoLayout();
       },
       undoable: false, // TODO: should we install this?
       animationDuration: 200,
@@ -996,6 +998,12 @@ export class AppComponent implements OnInit, OnDestroy {
     return classes;
   }
 
+  private autoLayout() {
+    if (this.autoLayoutEnabled) {
+      this.layout();
+    }
+  }
+
   layout() {
     const opts: fcose.FcoseLayoutOptions = {
       ...this.generateLayout(this.transformedGraph, false),
@@ -1355,6 +1363,6 @@ export class AppComponent implements OnInit, OnDestroy {
   updateTransformations(): void {
     this.transformGraph();
     this.updateCustomData();
-    this.layout(); // TODO: should we do this?
+    this.autoLayout();
   }
 }
