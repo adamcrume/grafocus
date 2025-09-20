@@ -28,6 +28,7 @@ import { CdkScrollable } from '@angular/cdk/scrolling';
   selector: 'help-dialog',
   templateUrl: './help-dialog.component.html',
   styleUrls: ['./help-dialog.component.scss'],
+  standalone: true,
   imports: [
     MatDialogTitle,
     CdkScrollable,

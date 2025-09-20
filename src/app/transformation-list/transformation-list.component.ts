@@ -80,6 +80,7 @@ export class GqlQueryValidatorDirective implements Validator {
   selector: 'transformation-list',
   templateUrl: './transformation-list.component.html',
   styleUrls: ['./transformation-list.component.scss'],
+  standalone: true,
   imports: [
     MatChipSet,
     CdkDropList,

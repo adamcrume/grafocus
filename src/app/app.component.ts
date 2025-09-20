@@ -377,6 +377,7 @@ function toDefinition(e: cytoscape.SingularElementArgument): ElementDefinition {
   selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss'],
+  standalone: true,
   imports: [
     MatToolbar,
     MatIconButton,

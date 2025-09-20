@@ -46,6 +46,7 @@ export interface CreateNodeDialogOutput {
   selector: 'create-node-dialog',
   templateUrl: './create-node-dialog.component.html',
   styleUrls: ['./create-node-dialog.component.scss'],
+  standalone: true,
   imports: [
     MatDialogTitle,
     CdkScrollable,

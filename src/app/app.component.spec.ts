@@ -93,6 +93,7 @@ describe('AppComponent', () => {
     );
     const cy = new CytoscapeHarness(fixture.componentInstance);
     const menu = await harness.getMenu();
+    await fixture.whenStable();
 
     cy.getNode('client_1').rightClick();
     expect(await menu.isVisible()).toBeTrue();
@@ -100,6 +101,8 @@ describe('AppComponent', () => {
     await harness.toggleSideNav();
     await harness.toggleGraphDefinition();
     await harness.setEditMode(true);
+    await fixture.whenStable();
+    //    fixture.detectChanges();
     cy.getNode('client_1').rightClick();
     expect(await menu.isVisible()).toBeTrue();
     expect(await menu.isItemVisible('add-edge')).toBeTrue();

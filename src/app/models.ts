@@ -117,7 +117,9 @@ function validateElements(
 }
 
 export function validateSavedData(input: any): SavedData {
-  const result = jsonschema.validate(input, schema);
+  const result = jsonschema.validate(input, schema, {
+    base: 'http://adamcrume.com',
+  });
   if (result.errors.length > 0) {
     throw new Error(
       result.errors.map((e) => `${e.path.join('.')} ${e.message}`).join('\n'),
