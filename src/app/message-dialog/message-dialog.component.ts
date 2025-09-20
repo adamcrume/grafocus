@@ -34,7 +34,6 @@ export interface MessageDialogInput {
   selector: 'message-dialog',
   templateUrl: './message-dialog.component.html',
   styleUrls: ['./message-dialog.component.scss'],
-  standalone: true,
   imports: [
     MatDialogTitle,
     CdkScrollable,

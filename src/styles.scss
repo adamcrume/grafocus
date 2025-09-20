@@ -15,7 +15,8 @@
  */
 
 @use '@angular/material' as mat;
-@include mat.core();
+@include mat.elevation-classes();
+@include mat.app-background();
 @import '@angular/material/prebuilt-themes/indigo-pink.css';
 @import "cytoscape-context-menus.css";
 

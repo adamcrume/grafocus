@@ -48,7 +48,6 @@ export interface CreateEdgeDialogOutput {
   selector: 'create-edge-dialog',
   templateUrl: './create-edge-dialog.component.html',
   styleUrls: ['./create-edge-dialog.component.scss'],
-  standalone: true,
   imports: [
     MatDialogTitle,
     CdkScrollable,

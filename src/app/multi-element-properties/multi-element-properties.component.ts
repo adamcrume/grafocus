@@ -57,7 +57,6 @@ interface Classes {
   selector: 'multi-element-properties',
   templateUrl: './multi-element-properties.component.html',
   styleUrls: ['./multi-element-properties.component.scss'],
-  standalone: true,
   imports: [
     MatChip,
     MatChipsModule,

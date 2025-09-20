@@ -35,7 +35,6 @@ import { MatFormField, MatLabel } from '@angular/material/form-field';
   selector: 'element-properties',
   templateUrl: './element-properties.component.html',
   styleUrls: ['./element-properties.component.scss'],
-  standalone: true,
   imports: [
     MatChip,
     MatChipsModule,
