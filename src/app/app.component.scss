@@ -75,8 +75,8 @@ element-properties {
 }
 
 mat-toolbar mat-slide-toggle {
+    margin-right: 8px;
     @include mat.slide-toggle-overrides((
         label-text-color: var(--mat-sys-on-primary),
     ));
-    margin-right: 8px;
 }

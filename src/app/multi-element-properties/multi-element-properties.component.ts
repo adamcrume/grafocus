@@ -18,9 +18,7 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 
 import { ElementDefinition } from '../models';
 import { COMMA, ENTER } from '@angular/cdk/keycodes';
-import { MatButton } from '@angular/material/button';
 import { FormsModule } from '@angular/forms';
-import { MatInput } from '@angular/material/input';
 import { MatFormField, MatLabel } from '@angular/material/form-field';
 import {
   MatChip,
@@ -68,9 +66,7 @@ interface Classes {
     MatFormField,
     MatIcon,
     MatLabel,
-    MatInput,
     FormsModule,
-    MatButton,
   ],
 })
 export class MultiElementPropertiesComponent {
