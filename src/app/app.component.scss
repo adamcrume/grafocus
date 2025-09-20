@@ -83,3 +83,47 @@ mat-sidenav-content {
 element-properties {
     width: 100%;
 }
+
+.search-wrapper {
+    border-radius: 32px;
+    display: inline-block;
+    background-color: var(--mat-sys-surface-variant);
+    position: relative;
+    margin-right: 32px;
+
+    .overlay {
+        pointer-events: none;
+        background-color: var(--mat-sys-on-surface);
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        right: 0;
+        opacity: 0;
+        border-radius: 32px;
+    }
+
+    mat-form-field {
+        @include mat.form-field-overrides((
+            filled-container-shape: circle,
+            outlined-outline-width: 0px,
+            outlined-focus-outline-width: 0px,
+        ));
+
+        mat-icon {
+            color: var(--mat-app-text-color);
+        }
+
+        input {
+            border-bottom: 10px solid currentcolor;
+        }
+    }
+}
+
+.search-wrapper:hover .overlay {
+    opacity: var(--mat-sys-hover-state-layer-opacity);
+}
+
+.search-wrapper:focus-within .overlay {
+    opacity: 0;
+}

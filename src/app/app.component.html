@@ -25,6 +25,17 @@
   </button>
   <span>Graph Explorer - {{title}}</span>
   <span class="spacer"></span>
+  <div class="search-wrapper">
+    <div class="overlay"></div>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <input type="search"
+             placeholder="Search"
+             matInput
+             [ngModel]="searchQuery"
+             (ngModelChange)="onSearch($event)">
+      <mat-icon matPrefix>search</mat-icon>
+    </mat-form-field>
+  </div>
   <mat-slide-toggle [(ngModel)]="autoLayoutEnabled">
     Auto-layout
   </mat-slide-toggle>

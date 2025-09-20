@@ -81,7 +81,7 @@ import {
   MatExpansionPanelTitle,
 } from '@angular/material/expansion';
 import { FormsModule } from '@angular/forms';
-import { MatInput } from '@angular/material/input';
+import { MatInput, MatInputModule } from '@angular/material/input';
 import { MatFormField, MatLabel } from '@angular/material/form-field';
 import {
   MatSidenavContainer,
@@ -388,6 +388,7 @@ function toDefinition(e: cytoscape.SingularElementArgument): ElementDefinition {
     MatFormField,
     MatLabel,
     MatInput,
+    MatInputModule,
     FormsModule,
     MatButton,
     MatAccordion,
@@ -443,6 +444,7 @@ export class AppComponent implements OnInit, OnDestroy {
   get description(): string {
     return this.cy?.data('description') ?? '';
   }
+  searchQuery: string = '';
 
   private menus: contextMenus.ContextMenu | undefined = undefined;
   private _editMode = false;
@@ -1364,5 +1366,27 @@ export class AppComponent implements OnInit, OnDestroy {
     this.transformGraph();
     this.updateCustomData();
     this.autoLayout();
+  }
+
+  onSearch(query: string): void {
+    if (!query) {
+      return;
+    }
+    this.cy?.$('*:selected').deselect();
+    let regexp;
+    try {
+      regexp = new RegExp(query, 'i');
+    } catch (e: unknown) {
+      return;
+    }
+    const matches = this.cy?.nodes()?.filter((n) => {
+      return n.data('label').match(regexp);
+    });
+    if (!matches) {
+      return;
+    }
+    matches.select();
+    this.cy?.stop();
+    this.cy?.animate({ fit: { eles: matches, padding: 0 } });
   }
 }
