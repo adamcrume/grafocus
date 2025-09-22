@@ -16,11 +16,16 @@
 
 @use '@angular/material' as mat;
 
-$palette: mat.m2-define-palette(mat.$m2-indigo-palette);
-
 :host {
     width: 100%;
     height: 100%;
+}
+
+mat-toolbar {
+  @include mat.toolbar-overrides((
+    container-background-color: var(--mat-sys-surface-container),
+    container-text-color: var(--mat-sys-on-surface-container),
+  ));
 }
 
 mat-sidenav-container {
@@ -28,6 +33,11 @@ mat-sidenav-container {
 }
 
 mat-sidenav {
+    @include mat.sidenav-overrides((
+        container-background-color: var(--mat-sys-surface-container),
+        container-text-color: var(--mat-sys-on-surface-container),
+        container-shape: 0,
+    ));
     max-width: 25%;
 }
 
@@ -72,11 +82,4 @@ mat-sidenav-content {
 
 element-properties {
     width: 100%;
-}
-
-mat-toolbar mat-slide-toggle {
-    margin-right: 8px;
-    @include mat.slide-toggle-overrides((
-        label-text-color: var(--mat-sys-on-primary),
-    ));
 }
