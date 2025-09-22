@@ -52,9 +52,9 @@ export class ElementPropertiesComponent {
   readonly separatorKeysCodes = [ENTER, COMMA] as const;
   @Input() set element(value: ElementDefinition) {
     this.id = value.data.id;
-    this.label = value.data['label'] ?? '';
+    this.label = value.data['user_data']?.['label'] ?? '';
     this.classes = value.classes ?? [];
-    this.description = value.data['description'] ?? '';
+    this.description = value.data['user_data']?.['description'] ?? '';
   }
   @Input() editMode = false;
   @Output() classesChange = new EventEmitter<string[]>();
