@@ -373,6 +373,11 @@ function toDefinition(e: cytoscape.SingularElementArgument): ElementDefinition {
   return d;
 }
 
+interface TransformedGraph {
+  graph: Graph<Value>;
+  visibleEdges: Set<string>;
+}
+
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
@@ -429,7 +434,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.serializedGraph,
     deserializeValue,
   );
-  private transformedGraph: Graph<Value>;
+  private transformedGraph: TransformedGraph;
   private style: Stylesheet[] = [];
   private selected: cytoscape.SingularElementReturnValue | undefined =
     undefined;
@@ -456,6 +461,23 @@ export class AppComponent implements OnInit, OnDestroy {
     if (this.menus) {
       updateMenuVisibility(this.menus, value);
     }
+    this.transformGraph();
+  }
+  private _showPlacementEdges = false;
+  get showPlacementEdges(): boolean {
+    return this._showPlacementEdges;
+  }
+  set showPlacementEdges(value: boolean) {
+    this._showPlacementEdges = value;
+    this.transformGraph();
+  }
+  private _showAlignmentEdges = false;
+  get showAlignmentEdges(): boolean {
+    return this._showAlignmentEdges;
+  }
+  set showAlignmentEdges(value: boolean) {
+    this._showAlignmentEdges = value;
+    this.transformGraph();
   }
 
   autoLayoutEnabled = true;
@@ -535,10 +557,10 @@ export class AppComponent implements OnInit, OnDestroy {
     const cy = cytoscape({
       data: this.data,
       container: this.graph.nativeElement,
-      elements: toElements(this.transformedGraph),
+      elements: toElements(this.transformedGraph.graph),
       style: this.style,
       layout: {
-        ...this.generateLayout(this.transformedGraph, true),
+        ...this.generateLayout(this.transformedGraph.graph, true),
         name: 'fcose',
       },
     });
@@ -882,25 +904,63 @@ export class AppComponent implements OnInit, OnDestroy {
     }
   }
 
-  private transform(graph: Graph<Value>): Graph<Value> {
+  private isVisibleEdge(edge: Edge<Value>): boolean {
+    if (!isSpecialEdge(edge)) {
+      return true;
+    }
+    if (
+      this.editMode &&
+      this.showPlacementEdges &&
+      (edge.labels.has(PLACE_RIGHT_OF_LABEL) ||
+        edge.labels.has(PLACE_BELOW_LABEL))
+    ) {
+      return true;
+    }
+    if (
+      this.editMode &&
+      this.showAlignmentEdges &&
+      (edge.labels.has(ALIGN_VERTICAL_LABEL) ||
+        edge.labels.has(ALIGN_HORIZONTAL_LABEL))
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  private transform(graph: Graph<Value>): TransformedGraph {
     for (const transformation of this.transformations) {
       if (transformation.enabled) {
         graph = transformation.queryPlan.execute(graph).graph;
       }
     }
-    return graph;
+    const visibleEdges = new Set<string>();
+    for (const edge of graph.edges) {
+      if (this.isVisibleEdge(edge)) {
+        visibleEdges.add(edge.id);
+      }
+    }
+    return {
+      graph,
+      visibleEdges,
+    };
   }
 
   // TODO: Instead of recomputing everything, we should push diffs through.
   private transformGraph(): void {
-    const oldTransformed = this.transformedGraph;
+    const oldGraph = this.transformedGraph.graph;
+    const oldVisibleEdges = this.transformedGraph.visibleEdges;
 
     this.transformedGraph = this.transform(this.originalGraph);
     if (!this.cy) {
       return;
     }
-    for (const node of oldTransformed.nodes) {
-      if (!this.transformedGraph.getNodeByID(node.id)) {
+    const graph = this.transformedGraph.graph;
+    const visibleEdges = this.transformedGraph.visibleEdges;
+    console.log(
+      `app.component.ts:945: visibleEdges = ${visibleEdges}, oldVisibleEdges = ${oldVisibleEdges}`,
+    ); // TODO: remove
+    for (const node of oldGraph.nodes) {
+      if (!graph.getNodeByID(node.id)) {
         const elt = this.cy.getElementById(node.id);
         if (elt && elt.length) {
           this.savedPositions.set(node.id, elt.position());
@@ -911,13 +971,13 @@ export class AppComponent implements OnInit, OnDestroy {
         this.cy.remove('#' + node.id);
       }
     }
-    for (const edge of oldTransformed.edges) {
-      if (!this.transformedGraph.getEdgeByID(edge.id)) {
-        this.cy.remove('#' + edge.id);
+    for (const edgeID of oldVisibleEdges) {
+      if (!visibleEdges.has(edgeID)) {
+        this.cy.remove('#' + edgeID);
       }
     }
-    for (const node of this.transformedGraph.nodes) {
-      const oldNode = oldTransformed.getNodeByID(node.id);
+    for (const node of graph.nodes) {
+      const oldNode = oldGraph.getNodeByID(node.id);
       if (oldNode) {
         const elt = this.cy.getElementById(node.id);
         if (elt && elt.length) {
@@ -928,11 +988,11 @@ export class AppComponent implements OnInit, OnDestroy {
           syncClasses(elt, node.labels);
           // explicitly not resetting position on existing nodes
           elt.move({
-            parent: parentOf(this.transformedGraph, node)?.id || null,
+            parent: parentOf(graph, node)?.id || null,
           });
         }
       } else {
-        const elt = nodeToElement(this.transformedGraph, node);
+        const elt = nodeToElement(graph, node);
         const pos = this.savedPositions.get(node.id);
         const newElt = this.cy.add(elt);
         if (pos) {
@@ -941,17 +1001,19 @@ export class AppComponent implements OnInit, OnDestroy {
         }
       }
     }
-    for (const edge of this.transformedGraph.edges) {
+    for (const edge of graph.edges) {
       if (edge.labels.has(PARENT_LABEL)) {
         const src = this.cy.getElementById(edge.srcID);
         if (src) {
           src.move({ parent: edge.dstID });
         }
       }
-      if (isSpecialEdge(edge)) {
+      if (!visibleEdges.has(edge.id)) {
         continue;
       }
-      const oldEdge = oldTransformed.getEdgeByID(edge.id);
+      const oldEdge = oldVisibleEdges.has(edge.id)
+        ? oldGraph.getEdgeByID(edge.id)
+        : null;
       if (oldEdge) {
         const elt = this.cy.getElementById(edge.id);
         if (elt && elt.length) {
@@ -1008,7 +1070,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   layout() {
     const opts: fcose.FcoseLayoutOptions = {
-      ...this.generateLayout(this.transformedGraph, false),
+      ...this.generateLayout(this.transformedGraph.graph, false),
       name: 'fcose',
       quality: 'proof',
       randomize: false,

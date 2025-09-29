@@ -471,6 +471,42 @@
       }
     },
     {
+      "selector": ".user_data__PLACE_RIGHT_OF",
+      "style": {
+        "label": "RIGHT OF",
+        "line-color": "#ff0",
+        "line-style": "dashed",
+        "target-arrow-color": "#ff0",
+        "target-arrow-shape": "triangle"
+      }
+    },
+    {
+      "selector": ".user_data__PLACE_BELOW",
+      "style": {
+        "label": "BELOW",
+        "line-color": "#00f",
+        "line-style": "dashed",
+        "target-arrow-color": "#00f",
+        "target-arrow-shape": "triangle"
+      }
+    },
+    {
+      "selector": ".user_data__ALIGN_VERTICAL",
+      "style": {
+        "label": "ALIGN VERTICAL",
+        "line-color": "#00f",
+        "line-style": "dotted",
+      }
+    },
+    {
+      "selector": ".user_data__ALIGN_HORIZONTAL",
+      "style": {
+        "label": "ALIGN HORIZONTAL",
+        "line-color": "#ff0",
+        "line-style": "dotted",
+      }
+    },
+    {
       "selector": ".user_data_network-link",
       "style": {}
     },

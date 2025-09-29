@@ -152,6 +152,18 @@
           <mat-slide-toggle class="edit-mode" [(ngModel)]="editMode">
             Edit mode
           </mat-slide-toggle>
+          <mat-slide-toggle
+            class="show-placement-edges"
+            [(ngModel)]="showPlacementEdges"
+            [disabled]="!editMode">
+            Show placement edges
+          </mat-slide-toggle>
+          <mat-slide-toggle
+            class="show-alignment-edges"
+            [(ngModel)]="showAlignmentEdges"
+            [disabled]="!editMode">
+            Show alignment edges
+          </mat-slide-toggle>
           <mat-form-field class="graph-def-field">
             <mat-label>Graph definition</mat-label>
             <textarea
