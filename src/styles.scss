@@ -35,3 +35,17 @@ body {
 
 html, body { height: 100%; }
 body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+
+// Workaround for:
+// https://github.com/angular/components/issues/26584
+// https://github.com/angular/components/issues/30158
+.mdc-evolution-chip-set__chips {
+    width: 100%;
+}
+.mdc-evolution-chip-set .mat-mdc-standard-chip {
+  .mdc-evolution-chip__cell--primary,
+  .mdc-evolution-chip__action--primary,
+  .mat-mdc-chip-action-label {
+    overflow: hidden;
+  }
+}
