@@ -17,23 +17,41 @@
 <mat-chip-set
   class="mat-mdc-chip-set-stacked"
   cdkDropList
-  (cdkDropListDropped)="transformationMoved($event)">
+  (cdkDropListDropped)="moved($event)">
   @for (transformation of transformations; track transformation) {
     <mat-chip-option
-      #toggle
+      #chip
       matTooltip="{{transformation.query}}"
       cdkDrag
       [selected]="transformation.enabled"
-      (click)="toggleTransformation(transformation, toggle.selected)"
-      (removed)="removeTransformation(transformation)">
+      (click)="toggle(transformation, chip.selected)"
+      (removed)="remove(transformation)">
       <mat-chip-option disabled *cdkDragPlaceholder></mat-chip-option>
       {{transformation.name}}
-      <button matChipRemove>
-        <mat-icon>cancel</mat-icon>
+      <button
+        matIconButton
+        matChipTrailingIcon
+        [matMenuTriggerFor]="chip_menu"
+        [matMenuTriggerData]="{transformation}">
+        <mat-icon>more_vert</mat-icon>
       </button>
     </mat-chip-option>
   }
 </mat-chip-set>
+
+<mat-menu #chip_menu="matMenu">
+  <ng-template matMenuContent let-transformation="transformation">
+    <button mat-menu-item (click)="remove(transformation)">
+      <mat-icon>remove</mat-icon>
+      <span>Remove</span>
+    </button>
+    <button mat-menu-item (click)="edit(transformation)">
+      <mat-icon>edit</mat-icon>
+      <span>Edit</span>
+    </button>
+  </ng-template>
+</mat-menu>
+
 <form #transformationForm="ngForm">
   <mat-form-field class="name-field">
     <mat-label>Name</mat-label>
@@ -56,11 +74,27 @@
       }}
     </mat-error>
   }
-  <button
-    [disabled]="!transformationForm.valid || !queryField.value"
-    mat-raised-button
-    (click)="addTransformation()">
-    Add
-    <mat-icon>add</mat-icon>
-  </button>
+  @if (editing) {
+    <button
+      [disabled]="!transformationForm.valid || !queryField.value"
+      mat-raised-button
+      (click)="save()">
+      Save
+      <mat-icon>save</mat-icon>
+    </button>
+    <button
+      mat-raised-button
+      (click)="reset()">
+      Cancel
+      <mat-icon>cancel</mat-icon>
+    </button>
+  } @else {
+    <button
+      [disabled]="!transformationForm.valid || !queryField.value"
+      mat-raised-button
+      (click)="add()">
+      Add
+      <mat-icon>add</mat-icon>
+    </button>
+   }
 </form>

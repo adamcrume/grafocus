@@ -44,11 +44,12 @@ import { createTransformation, Transformation } from '../transformation';
 import { MatButton } from '@angular/material/button';
 import { MatInput } from '@angular/material/input';
 import { MatFormField, MatLabel, MatError } from '@angular/material/form-field';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltip } from '@angular/material/tooltip';
 import {
   MatChipSet,
   MatChipOption,
-  MatChipRemove,
+  MatChipsModule,
 } from '@angular/material/chips';
 
 @Directive({
@@ -88,7 +89,6 @@ export class GqlQueryValidatorDirective implements Validator {
     CdkDrag,
     MatTooltip,
     CdkDragPlaceholder,
-    MatChipRemove,
     MatIcon,
     FormsModule,
     MatFormField,
@@ -97,6 +97,8 @@ export class GqlQueryValidatorDirective implements Validator {
     GqlQueryValidatorDirective,
     MatError,
     MatButton,
+    MatMenuModule,
+    MatChipsModule,
   ],
 })
 export class TransformationListComponent {
@@ -105,27 +107,52 @@ export class TransformationListComponent {
   name = '';
   // must be bound to with ngModel to enable validation
   query = '';
+  editing: Transformation | null = null;
 
-  addTransformation() {
-    const name = this.name || this.query;
-    this.transformations.push(createTransformation(name, this.query, true));
-    this.transformationsChange.emit(this.transformations);
+  reset() {
     this.name = '';
     this.query = '';
+    this.editing = null;
   }
 
-  removeTransformation(transformation: Transformation) {
+  private create(enabled: boolean) {
+    return createTransformation(this.name || this.query, this.query, enabled);
+  }
+
+  add() {
+    this.transformations.push(this.create(true));
+    this.transformationsChange.emit(this.transformations);
+    this.reset();
+  }
+
+  remove(transformation: Transformation) {
     const ix = this.transformations.indexOf(transformation);
     this.transformations.splice(ix, 1);
     this.transformationsChange.emit(this.transformations);
   }
 
-  toggleTransformation(transformation: Transformation, value: boolean) {
+  edit(transformation: Transformation) {
+    this.editing = transformation;
+    this.name = transformation.name;
+    this.query = transformation.query;
+  }
+
+  save() {
+    const editing = this.editing;
+    if (editing) {
+      const ix = this.transformations.indexOf(editing);
+      this.transformations[ix] = this.create(editing.enabled);
+      this.transformationsChange.emit(this.transformations);
+    }
+    this.reset();
+  }
+
+  toggle(transformation: Transformation, value: boolean) {
     transformation.enabled = value;
     this.transformationsChange.emit(this.transformations);
   }
 
-  transformationMoved(event: CdkDragDrop<unknown>) {
+  moved(event: CdkDragDrop<unknown>) {
     moveItemInArray(
       this.transformations,
       event.previousIndex,
