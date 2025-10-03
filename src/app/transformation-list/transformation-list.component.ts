@@ -102,12 +102,16 @@ export class GqlQueryValidatorDirective implements Validator {
 export class TransformationListComponent {
   @Input() transformations: Transformation[] = [];
   @Output() transformationsChange = new EventEmitter<Transformation[]>();
+  name = '';
   // must be bound to with ngModel to enable validation
-  userQuery = '';
+  query = '';
 
-  addTransformation(name: string, query: string) {
-    this.transformations.push(createTransformation(name, query, true));
+  addTransformation() {
+    const name = this.name || this.query;
+    this.transformations.push(createTransformation(name, this.query, true));
     this.transformationsChange.emit(this.transformations);
+    this.name = '';
+    this.query = '';
   }
 
   removeTransformation(transformation: Transformation) {

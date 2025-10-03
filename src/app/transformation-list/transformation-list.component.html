@@ -35,13 +35,17 @@
   }
 </mat-chip-set>
 <form #transformationForm="ngForm">
+  <mat-form-field class="name-field">
+    <mat-label>Name</mat-label>
+    <input matInput [(ngModel)]="name" name="name">
+  </mat-form-field>
   <mat-form-field class="query-field">
-    <mat-label>New transformation</mat-label>
+    <mat-label>Query</mat-label>
     <textarea
       matInput
-      #newTransformationField
+      #queryField
       gqlQuery
-      [(ngModel)]="userQuery"
+      [(ngModel)]="query"
       name="transformation"
       rows="4"></textarea>
   </mat-form-field>
@@ -53,9 +57,9 @@
     </mat-error>
   }
   <button
-    [disabled]="!transformationForm.valid || !newTransformationField.value"
+    [disabled]="!transformationForm.valid || !queryField.value"
     mat-raised-button
-    (click)="addTransformation(newTransformationField.value, newTransformationField.value); newTransformationField.value = ''">
+    (click)="addTransformation()">
     Add
     <mat-icon>add</mat-icon>
   </button>
