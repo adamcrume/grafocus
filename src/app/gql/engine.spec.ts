@@ -312,7 +312,7 @@ describe('execute', () => {
     ]);
   });
 
-  it('can match quantified paths', () => {
+  it('can match * quantified paths', () => {
     const graph = newGraph()
       .createNode('n1')
       .createNode('n2')
@@ -333,6 +333,26 @@ describe('execute', () => {
       ['n3', '', 'n3'],
       ['n3', 'e3', 'n4'],
       ['n4', '', 'n4'],
+    ]);
+  });
+
+  it('can match + quantified paths', () => {
+    const graph = newGraph()
+      .createNode('n1')
+      .createNode('n2')
+      .createNode('n3')
+      .createNode('n4')
+      .createEdge('e1', 'n1', 'n2')
+      .createEdge('e2', 'n2', 'n3')
+      .createEdge('e3', 'n3', 'n4');
+    const query = 'match (x)-[e]->+(y) return x, e, y';
+    expect(executeQuery(query, graph).data).toEqual([
+      ['n1', 'e1', 'n2'],
+      ['n1', 'e1,e2', 'n3'],
+      ['n1', 'e1,e2,e3', 'n4'],
+      ['n2', 'e2', 'n3'],
+      ['n2', 'e2,e3', 'n4'],
+      ['n3', 'e3', 'n4'],
     ]);
   });
 

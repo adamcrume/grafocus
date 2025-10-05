@@ -304,6 +304,11 @@ quantifier = "*" {
     min: 0,
     max: 1/0,
   };
+} / "+" {
+  return {
+    min: 1,
+    max: 1/0,
+  };
 }
 
 edge = left:"<"? "-" sp namelabel:(
