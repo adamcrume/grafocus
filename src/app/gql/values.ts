@@ -110,6 +110,10 @@ export function isNumber(value: Value): value is NumberValue {
   return valueType(value).kind === 'number';
 }
 
+export function isNodeRef(value: Value): value is NodeRef {
+  return valueType(value).kind === 'node_ref';
+}
+
 export function cloneValue(value: Value): Value {
   if (isList(value)) {
     return {
@@ -183,6 +187,13 @@ export function numberList(values: number[]): List {
     type: NUMBER_LIST,
     value: values.map(primitiveValue),
   };
+}
+
+export function tryCastNull(value: Value | undefined): null | undefined {
+  if (value?.type?.kind === 'null') {
+    return value.value as null;
+  }
+  return undefined;
 }
 
 export function tryCastString(value: Value | undefined): string | undefined {
@@ -378,4 +389,30 @@ export class ValueArraySet {
   [Symbol.iterator](): IterableIterator<Value[]> {
     return this.values.values();
   }
+}
+
+export function compareValues(left: Value, right: Value): number | null {
+  if (isNumber(left) && isNumber(right)) {
+    if (left.value < right.value) {
+      return -1;
+    } else if (left.value === right.value) {
+      return 0;
+    } else if (left.value > right.value) {
+      return 1;
+    } else {
+      return null;
+    }
+  }
+  if (isNodeRef(left) && isNodeRef(right)) {
+    if (left.value < right.value) {
+      return -1;
+    } else if (left.value === right.value) {
+      return 0;
+    } else {
+      return 1;
+    }
+  }
+  throw new Error(
+    `unimplemented: ${JSON.stringify(left)} and ${JSON.stringify(right)}`,
+  );
 }

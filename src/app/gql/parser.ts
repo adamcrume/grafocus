@@ -167,6 +167,15 @@ export interface FunctionCall {
   args: Expression[];
 }
 
+export type ComparisonOp = '=' | '<>' | '<' | '>' | '<=' | '>=';
+
+export interface Comparison {
+  kind: 'comparison';
+  left: Expression;
+  right: Expression;
+  op: ComparisonOp;
+}
+
 export type Expression =
   | And
   | FunctionCall
@@ -175,7 +184,8 @@ export type Expression =
   | NumberLiteral
   | Or
   | PathExpression
-  | StringLiteral;
+  | StringLiteral
+  | Comparison;
 
 export type MapLiteral = Array<[string, Expression]>;
 

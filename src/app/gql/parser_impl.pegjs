@@ -290,11 +290,24 @@ andExpression = e:notExpression|1.., sp "and"i sp| {
   };
 }
 
-notExpression = not:("not"i sp)* a:atom {
+notExpression = not:("not"i sp)* e:comparisonExpression {
   if (not.length % 2) {
-    return {kind: 'not', value: a};
+    return {kind: 'not', value: e};
   }
-  return a;
+  return e;
+}
+
+comparisonExpression = a:atom rhs:(sp @("="/"<>"/"<"/">"/"<="/">=") sp @atom)? {
+  if (rhs) {
+    return {
+      kind: 'comparison',
+      left: a,
+      right: rhs[1],
+      op: rhs[0],
+    };
+  } else {
+    return a;
+  }
 }
 
 mapLiteral = "{" sp @(k:identifier sp ":" sp v:expression {return [k, v]})|.., sp "," sp| sp "}"

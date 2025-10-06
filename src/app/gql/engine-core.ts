@@ -26,7 +26,9 @@ import {
   Path,
 } from './parser';
 import {
+  NULL,
   booleanValue,
+  compareValues,
   edgeRefValue,
   listValue,
   nodeRefValue,
@@ -147,6 +149,10 @@ function labelsMatch(
 function valueMatches(value: Value | undefined, pattern: Expression): boolean {
   if (pattern.kind === 'functionCall') {
     throw new Error(`Matching properties with function is not yet implemented`);
+  } else if (pattern.kind === 'comparison') {
+    throw new Error(
+      `Matching properties with comparisons is not yet implemented`,
+    );
   }
   // TODO: make smarter
   return value?.value === pattern.value;
@@ -634,6 +640,35 @@ export function planEvaluate(expression: Expression): EvaluatePlan {
           arg(variables),
         );
         return funcEvaluate(argValues, variables);
+      };
+    };
+  } else if (expression.kind === 'comparison') {
+    const leftPlan = planEvaluate(expression.left);
+    const rightPlan = planEvaluate(expression.right);
+    let compare: (c: number | null) => Value;
+    if (expression.op === '<>') {
+      compare = (c) => {
+        if (c === null) {
+          return NULL;
+        }
+        return booleanValue(c != 0);
+      };
+    } else {
+      throw new Error(
+        `Unrecognized comparison: ${JSON.stringify(expression.op)}`,
+      );
+    }
+    return (
+      graph: Graph<Value>,
+      queryStats: QueryStatsState,
+      functions: Map<string, Func>,
+    ) => {
+      const evaluateLeft = leftPlan(graph, queryStats, functions);
+      const evaluateRight = rightPlan(graph, queryStats, functions);
+      return (variables: Match) => {
+        return compare(
+          compareValues(evaluateLeft(variables), evaluateRight(variables)),
+        );
       };
     };
   } else {

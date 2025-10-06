@@ -68,8 +68,10 @@ import {
   listValue,
   serializeValue,
   stringValue,
+  tryCastBoolean,
   tryCastEdgeRef,
   tryCastNodeRef,
+  tryCastNull,
   Value,
   ValueArraySet,
 } from './values';
@@ -177,7 +179,11 @@ function joinMatches(left: Match[], right: Match[]): Match[] {
 }
 
 interface Stagelet extends QueryPlanStage {
-  prepare(graph: Graph<Value>, queryStats: QueryStatsState): PreparedStagelet;
+  prepare(
+    graph: Graph<Value>,
+    queryStats: QueryStatsState,
+    functions: Map<string, Func>,
+  ): PreparedStagelet;
 }
 
 interface PreparedStagelet {
@@ -188,6 +194,8 @@ interface FilterStage extends QueryPlanStage {
   execute(
     graph: Graph<Value>,
     queryStats: QueryStatsState,
+    functions: Map<string, Func>,
+    // TODO: should this return Value instead of boolean?
   ): (match: Match) => boolean;
 }
 
@@ -420,8 +428,9 @@ function filterMatches(filter: FilterStage): Stagelet {
     prepare(
       graph: Graph<Value>,
       queryStats: QueryStatsState,
+      functions: Map<string, Func>,
     ): PreparedStagelet {
-      const matchFilter = filter.execute(graph, queryStats);
+      const matchFilter = filter.execute(graph, queryStats, functions);
       return {
         execute(match: Match): IterableIterator<Match> {
           return (function* () {
@@ -435,6 +444,7 @@ function filterMatches(filter: FilterStage): Stagelet {
   };
 }
 
+// TODO: just wrap up planEvaluate
 function filterByExpression(expression: Expression): FilterStage {
   if (expression.kind === 'path') {
     return filterByPathExistence(expression.value);
@@ -449,8 +459,9 @@ function filterByExpression(expression: Expression): FilterStage {
       execute(
         graph: Graph<Value>,
         queryStats: QueryStatsState,
+        functions: Map<string, Func>,
       ): (match: Match) => boolean {
-        const childFilter = child.execute(graph, queryStats);
+        const childFilter = child.execute(graph, queryStats, functions);
         return (match) => !childFilter(match);
       },
     };
@@ -465,8 +476,11 @@ function filterByExpression(expression: Expression): FilterStage {
       execute(
         graph: Graph<Value>,
         queryStats: QueryStatsState,
+        functions: Map<string, Func>,
       ): (match: Match) => boolean {
-        const childFilters = children.map((c) => c.execute(graph, queryStats));
+        const childFilters = children.map((c) =>
+          c.execute(graph, queryStats, functions),
+        );
         return (match) => childFilters.every((c) => c(match));
       },
     };
@@ -481,15 +495,43 @@ function filterByExpression(expression: Expression): FilterStage {
       execute(
         graph: Graph<Value>,
         queryStats: QueryStatsState,
+        functions: Map<string, Func>,
       ): (match: Match) => boolean {
-        const childFilters = children.map((c) => c.execute(graph, queryStats));
+        const childFilters = children.map((c) =>
+          c.execute(graph, queryStats, functions),
+        );
         return (match) => childFilters.some((c) => c(match));
       },
     };
   } else {
-    throw new Error(
-      `Unimplemented WHERE clause: ${JSON.stringify(expression)}`,
-    );
+    const evaluate = planEvaluate(expression);
+    return {
+      stageName: () => 'filter_by_expression',
+      stageChildren(): QueryPlanStage[] {
+        return [];
+      },
+      stageData: () => [['expression', formatExpression(expression)]],
+      execute(
+        graph: Graph<Value>,
+        queryStats: QueryStatsState,
+        functions: Map<string, Func>,
+      ): (match: Match) => boolean {
+        const matcher = evaluate(graph, queryStats, functions);
+        return (match: Match) => {
+          const value = matcher(match);
+          const b = tryCastBoolean(value);
+          if (b !== undefined) {
+            return b;
+          }
+          if (tryCastNull(value) !== undefined) {
+            return false;
+          }
+          throw new Error(
+            `Non-boolean value used as a predicate: ${JSON.stringify(serializeValue(value))}`,
+          );
+        };
+      },
+    };
   }
 }
 
@@ -655,7 +697,11 @@ function planRead(read: ReadClause): Stage {
     execute(state: State): void {
       let matches = state.matches;
       for (const stage of plan.stages) {
-        const preparedStage = stage.prepare(state.graph, state.queryStats);
+        const preparedStage = stage.prepare(
+          state.graph,
+          state.queryStats,
+          state.functions,
+        );
         matches = matches.flatMap((m) => [...preparedStage.execute(m)]);
       }
       state.matches = matches;
@@ -682,7 +728,7 @@ function planMerge(merge: Merge): Stage {
     stageData: () => null,
     execute(state: State): void {
       const preparedReadStages = readPlan.stages.map((s) =>
-        s.prepare(state.graph, state.queryStats),
+        s.prepare(state.graph, state.queryStats, state.functions),
       );
       const preparedCreate = prepareCreate(
         createPlan,

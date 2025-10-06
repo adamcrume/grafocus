@@ -468,6 +468,20 @@ describe('execute', () => {
     ]);
   });
 
+  it('can filter by expression', () => {
+    const graph = newGraph()
+      .createNode('n1')
+      .createNode('n2')
+      .createEdge('e1', 'n1', 'n1')
+      .createEdge('e2', 'n1', 'n2')
+      .createEdge('e3', 'n2', 'n2');
+    const query = 'match (x)--(y) where x <> y return x, y';
+    expect(executeQuery(query, graph).data).toEqual([
+      ['n1', 'n2'],
+      ['n2', 'n1'],
+    ]);
+  });
+
   it('can filter by path existence from start', () => {
     const graph = newGraph()
       .createNode('n1')
