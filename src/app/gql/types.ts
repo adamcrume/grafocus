@@ -43,6 +43,17 @@ export const ANY: AnyType = {
   },
 };
 
+export interface NullType extends TypeBase {
+  kind: 'null';
+}
+
+export const NULL: NullType = {
+  kind: 'null',
+  toString() {
+    return 'NULL';
+  },
+};
+
 export interface BooleanType extends TypeBase {
   kind: 'boolean';
 }
@@ -50,7 +61,7 @@ export interface BooleanType extends TypeBase {
 export const BOOLEAN: BooleanType = {
   kind: 'boolean',
   toString() {
-    return 'BOOLEAN';
+    return 'BOOLEAN NOT NULL';
   },
 };
 
@@ -61,7 +72,7 @@ export interface StringType extends TypeBase {
 export const STRING: StringType = {
   kind: 'string',
   toString() {
-    return 'STRING';
+    return 'STRING NOT NULL';
   },
 };
 
@@ -72,7 +83,7 @@ export interface NumberType extends TypeBase {
 export const NUMBER: NumberType = {
   kind: 'number',
   toString() {
-    return 'NUMBER';
+    return 'NUMBER NOT NULL';
   },
 };
 
@@ -99,7 +110,7 @@ export interface NodeRefType extends TypeBase {
 export const NODE_REF: NodeRefType = {
   kind: 'node_ref',
   toString() {
-    return 'NODE';
+    return 'NODE NOT NULL';
   },
 };
 
@@ -110,12 +121,13 @@ export interface EdgeRefType extends TypeBase {
 export const EDGE_REF: EdgeRefType = {
   kind: 'edge_ref',
   toString() {
-    return 'RELATIONSHIP';
+    return 'RELATIONSHIP NOT NULL';
   },
 };
 
 export type Type =
   | AnyType
+  | NullType
   | BooleanType
   | EdgeRefType
   | ListType
@@ -130,9 +142,16 @@ export function listOf(element: Type): ListType {
     kind: 'list',
     inner: element,
     toString() {
-      return `LIST<${element}>`;
+      return `LIST<${element}> NOT NULL`;
     },
   };
+}
+
+function stripSuffix(value: string, suffix: string): string {
+  if (value.endsWith(suffix)) {
+    return value.substring(0, value.length - suffix.length);
+  }
+  return value;
 }
 
 export function unionOf(types: Type[]): Type {
@@ -176,6 +195,11 @@ export function unionOf(types: Type[]): Type {
         return 'UNION<>';
       } else if (inner.length === 1) {
         return `UNION<${inner[0]}>`;
+      } else if (inner[0].kind === 'null') {
+        return inner
+          .slice(1)
+          .map((t) => stripSuffix(t.toString(), ' NOT NULL'))
+          .join(' | ');
       }
       return inner.map((t) => t.toString()).join(' | ');
     },
@@ -189,22 +213,24 @@ function typeIndex(t: Type): number {
   switch (kind) {
     case 'nothing':
       return 0;
-    case 'boolean':
+    case 'null':
       return 1;
-    case 'string':
+    case 'boolean':
       return 2;
-    case 'number':
+    case 'string':
       return 3;
-    case 'node_ref':
+    case 'number':
       return 4;
-    case 'edge_ref':
+    case 'node_ref':
       return 5;
-    case 'list':
+    case 'edge_ref':
       return 6;
-    case 'union':
+    case 'list':
       return 7;
-    case 'any':
+    case 'union':
       return 8;
+    case 'any':
+      return 9;
     default:
       checkExhaustive(kind);
   }
@@ -222,6 +248,7 @@ function compareTypes(a: Type, b: Type): number {
   const kind = a.kind;
   switch (kind) {
     case 'nothing':
+    case 'null':
     case 'boolean':
     case 'string':
     case 'number':

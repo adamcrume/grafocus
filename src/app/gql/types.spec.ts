@@ -26,18 +26,23 @@ import {
   unionOf,
   STRING,
   STRING_LIST,
+  NULL,
   NUMBER,
   NUMBER_LIST,
 } from './types';
 
 describe('toString', () => {
   it('works', () => {
-    expect('' + listOf(STRING)).toEqual('LIST<STRING>');
+    expect('' + listOf(STRING)).toEqual('LIST<STRING NOT NULL> NOT NULL');
     expect('' + unionOf([])).toEqual('NOTHING');
-    expect('' + unionOf([STRING])).toEqual('STRING');
-    expect('' + unionOf([STRING, NUMBER])).toEqual('STRING | NUMBER');
+    expect('' + unionOf([STRING])).toEqual('STRING NOT NULL');
+    expect('' + unionOf([STRING, NULL])).toEqual('STRING');
+    expect('' + unionOf([STRING, NUMBER])).toEqual(
+      'STRING NOT NULL | NUMBER NOT NULL',
+    );
+    expect('' + unionOf([STRING, NUMBER, NULL])).toEqual('STRING | NUMBER');
     expect('' + listOf(unionOf([STRING, NUMBER]))).toEqual(
-      'LIST<STRING | NUMBER>',
+      'LIST<STRING NOT NULL | NUMBER NOT NULL> NOT NULL',
     );
   });
 });
