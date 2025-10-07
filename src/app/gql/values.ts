@@ -24,6 +24,8 @@ import {
   ListType,
   NODE_REF,
   NodeRefType,
+  NULL as NULL_T,
+  NullType,
   NUMBER,
   NUMBER_LIST,
   NumberType,
@@ -36,6 +38,16 @@ export interface ValueBase {
   type: Type;
   value: unknown;
 }
+
+export interface NullValue extends ValueBase {
+  type: NullType;
+  value: null;
+}
+
+export const NULL: NullValue = {
+  type: NULL_T,
+  value: null,
+};
 
 export interface BooleanValue extends ValueBase {
   type: BooleanType;
@@ -78,6 +90,7 @@ export interface EdgeRef extends ValueBase {
 }
 
 export type Value =
+  | NullValue
   | BooleanValue
   | EdgeRef
   | List
@@ -130,16 +143,19 @@ export function stringValue(value: string): StringValue {
   };
 }
 
+export function primitiveValue(value: null): NullValue;
 export function primitiveValue(value: boolean): BooleanValue;
 export function primitiveValue(value: number): NumberValue;
 export function primitiveValue(value: string): StringValue;
 export function primitiveValue(
-  value: boolean | number | string,
-): BooleanValue | NumberValue | StringValue;
+  value: null | boolean | number | string,
+): NullValue | BooleanValue | NumberValue | StringValue;
 export function primitiveValue(
-  value: boolean | number | string,
-): BooleanValue | NumberValue | StringValue {
-  if (typeof value === 'boolean') {
+  value: null | boolean | number | string,
+): NullValue | BooleanValue | NumberValue | StringValue {
+  if (value === null) {
+    return NULL;
+  } else if (typeof value === 'boolean') {
     return booleanValue(value);
   } else if (typeof value === 'number') {
     return numberValue(value);
@@ -285,6 +301,7 @@ export declare interface SerializedEdgeRef {
 }
 
 export type SerializedValue =
+  | null
   | boolean
   | string
   | number
@@ -294,8 +311,14 @@ export type SerializedValue =
 
 export function serializeValue(value: Value): SerializedValue {
   const kind = value.type.kind;
-  if (kind === 'boolean' || kind === 'string' || kind === 'number') {
-    return (value as BooleanValue | StringValue | NumberValue).value;
+  if (
+    kind === 'null' ||
+    kind === 'boolean' ||
+    kind === 'string' ||
+    kind === 'number'
+  ) {
+    return (value as NullValue | BooleanValue | StringValue | NumberValue)
+      .value;
   }
   if (kind === 'node_ref') {
     return value as NodeRef;
@@ -310,6 +333,9 @@ export function serializeValue(value: Value): SerializedValue {
 }
 
 export function deserializeValue(value: unknown): Value {
+  if (value === null) {
+    return NULL;
+  }
   if (typeof value === 'boolean') {
     return booleanValue(value);
   }
