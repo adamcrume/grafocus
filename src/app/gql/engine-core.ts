@@ -15,10 +15,16 @@
  */
 
 import Immutable from 'immutable';
-import { formatLabelExpression, formatMapLiteral } from './formatter';
+import {
+  formatEdge,
+  formatLabelExpression,
+  formatMapLiteral,
+  quoteIdentifier,
+} from './formatter';
 import { Edge, Graph, Node } from './graph';
 import { iter } from './iter';
 import {
+  Direction,
   Edge as ASTEdge,
   Expression,
   LabelExpression,
@@ -26,8 +32,11 @@ import {
   Path,
 } from './parser';
 import {
+  FALSE,
   NULL,
+  TRUE,
   booleanValue,
+  checkCastNodeRef,
   compareValues,
   edgeRefValue,
   listValue,
@@ -252,6 +261,171 @@ export class ScanGraph extends MatchInitializer {
         };
       }
     };
+  }
+}
+
+export class MoveHeadToVariable extends MatchInitializer {
+  constructor(readonly variableName: string) {
+    super();
+  }
+
+  override stageName(): string {
+    return 'move_head_to_variable';
+  }
+
+  override stageChildren(): QueryPlanStage[] {
+    return [];
+  }
+
+  override stageData(): string {
+    return quoteIdentifier(this.variableName);
+  }
+
+  override prepareInitial(
+    graph: Graph<Value>,
+  ): (match: Match) => IterableIterator<PathMatch> {
+    const self = this;
+    return function* (match: Match) {
+      const value = match.get(self.variableName);
+      if (value === undefined) {
+        throw new Error(`Variable ${self.variableName} not defined`);
+      }
+      const nodeID = checkCastNodeRef(value);
+      if (nodeID === undefined) {
+        throw new Error(
+          `Variable ${self.variableName} is not a node (${JSON.stringify(value)})`,
+        );
+      }
+      const node = graph.getNodeByID(nodeID);
+      if (node === undefined) {
+        throw new Error(
+          `Node ${nodeID} (from variable ${self.variableName}) not found`,
+        );
+      }
+      yield {
+        match,
+        head: node,
+        // This won't work once we use this class within the same graph pattern, i.e. multiple
+        // paths within the same MATCH.
+        traversedEdges: new Set(),
+      };
+    };
+  }
+}
+
+export class MoveHeadToID extends MatchInitializer {
+  constructor(readonly id: string) {
+    super();
+  }
+
+  override stageName(): string {
+    return 'move_head_to_id';
+  }
+
+  override stageChildren(): QueryPlanStage[] {
+    return [];
+  }
+
+  override stageData(): string {
+    return quoteIdentifier(this.id);
+  }
+
+  override prepareInitial(
+    graph: Graph<Value>,
+  ): (match: Match) => IterableIterator<PathMatch> {
+    const node = graph.getNodeByID(this.id);
+    if (node === undefined) {
+      throw new Error(`Node ${this.id} not found`);
+    }
+    return function* (match: Match) {
+      yield {
+        match,
+        head: node,
+        // This won't work once we use this class within the same graph pattern, i.e. multiple
+        // paths within the same MATCH.
+        traversedEdges: new Set(),
+      };
+    };
+  }
+}
+
+class BuildReachabilitySet implements QueryPlanStage {
+  constructor(
+    private readonly id: string,
+    private readonly edge: ASTEdge,
+  ) {}
+
+  stageName(): string {
+    return 'build_reachability_set';
+  }
+
+  stageChildren(): QueryPlanStage[] {
+    return [];
+  }
+
+  stageData(): QueryPlanStageData {
+    return [
+      ['id', this.id],
+      ['edge', formatEdge(this.edge)],
+    ];
+  }
+
+  build(graph: Graph<Value>, queryStats: QueryStatsState): Set<string> {
+    const start = graph.getNodeByID(this.id);
+    const queue = [start];
+    const nodes = new Set<string>();
+    queryStats.countNodeVisit();
+    nodes.add(this.id);
+    while (true) {
+      const head = queue.pop();
+      if (!head) {
+        break;
+      }
+      const edges = [];
+      for (const [edge, next] of graph.outgoingNeighbors(head)) {
+        edges.push({ edge, next, forbiddenDirection: 'LEFT' });
+      }
+      for (const [edge, next] of graph.incomingNeighbors(head)) {
+        edges.push({ edge, next, forbiddenDirection: 'RIGHT' });
+      }
+      for (const { edge, next, forbiddenDirection } of edges) {
+        if (
+          this.edge.direction !== forbiddenDirection &&
+          edgeMatches(edge, this.edge)
+        ) {
+          if (!nodes.has(next.id)) {
+            queryStats.countNodeVisit();
+            queue.push(next);
+            nodes.add(next.id);
+          }
+        }
+      }
+    }
+    return nodes;
+  }
+}
+
+class CheckReachabilitySet implements QueryPlanStage {
+  constructor(private readonly name: string) {}
+
+  stageName(): string {
+    return 'check_reachability_set';
+  }
+
+  stageChildren(): QueryPlanStage[] {
+    return [];
+  }
+
+  stageData(): QueryPlanStageData {
+    return [['name', this.name]];
+  }
+
+  matches(reachability: Set<string>, match: Match): boolean {
+    const id = checkCastNodeRef(match.get(this.name));
+    if (id === undefined) {
+      return false;
+    }
+    return reachability.has(id);
   }
 }
 
@@ -562,27 +736,152 @@ export type Func = (
 
 export interface EvaluateStage extends QueryPlanStage {
   execute(
-      graph: Graph<Value>,
-      queryStats: QueryStatsState,
-      functions: Map<string, Func>,
+    graph: Graph<Value>,
+    queryStats: QueryStatsState,
+    functions: Map<string, Func>,
   ): (variables: Match) => Value;
+}
+
+export function fixedID(node: ASTNode): string | undefined {
+  const idExpression = node.properties
+    ?.filter(([k, v]) => k === '_ID')
+    ?.map(([k, v]) => v)?.[0];
+  let id: string | undefined = undefined;
+  if (idExpression?.kind === 'string') {
+    return idExpression.value;
+  }
+  return undefined;
+}
+
+function reverseDirection(direction: Direction): Direction {
+  if (direction === 'LEFT') {
+    return 'RIGHT';
+  } else if (direction === 'RIGHT') {
+    return 'LEFT';
+  } else {
+    return 'NONE';
+  }
+}
+
+// Can be replaced by Array.toReversed once that's available.
+function toReversed<T>(array: T[]): T[] {
+  const out = [...array];
+  out.reverse();
+  return out;
+}
+
+export function reversePath(path: Path): Path {
+  return {
+    nodes: toReversed(path.nodes),
+    edges: toReversed(path.edges).map((e) => ({
+      ...e,
+      direction: reverseDirection(e.direction),
+    })),
+  };
 }
 
 function planConstant(value: Value): EvaluateStage {
   return {
     stageName: () => 'constant',
     stageChildren(): QueryPlanStage[] {
-        return [];
+      return [];
     },
     stageData: () => [['value', value]],
     execute(
-        graph: Graph<Value>,
-        queryStats: QueryStatsState,
-        functions: Map<string, Func>,
+      graph: Graph<Value>,
+      queryStats: QueryStatsState,
+      functions: Map<string, Func>,
     ): (variables: Match) => Value {
-        return () => value;
-    }
+      return () => value;
+    },
   };
+}
+
+// TODO: unify with planReadPath in engine.ts.
+function planEvaluatePathExistence(path: Path): EvaluateStage {
+  if (
+    path.nodes.length === 2 &&
+    path.edges[0].quantifier?.min === 0 &&
+    path.edges[0].quantifier?.max === 1 / 0 &&
+    !path.edges[0].name
+  ) {
+    const last = path.nodes.length - 1;
+    const firstID = fixedID(path.nodes[0]);
+    const lastID = fixedID(path.nodes[last]);
+    const goodForward =
+      firstID && path.nodes[last].name && nodeOnlyMatchesID(path.nodes[0]);
+    const goodBackward =
+      lastID && path.nodes[0].name && nodeOnlyMatchesID(path.nodes[last]);
+    if (goodForward || goodBackward) {
+      let startID = firstID;
+      if (!goodForward) {
+        startID = lastID;
+        path = reversePath(path);
+      }
+      const build = new BuildReachabilitySet(startID ?? '', path.edges[0]);
+      const check = new CheckReachabilitySet(path.nodes[last].name ?? '');
+      return {
+        stageName: () => 'match_path_existence',
+        stageChildren(): QueryPlanStage[] {
+          return [build, check];
+        },
+        stageData: () => [],
+        execute(
+          graph: Graph<Value>,
+          queryStats: QueryStatsState,
+        ): (match: Match) => Value {
+          const reachabilitySet = build.build(graph, queryStats);
+          return (m) => booleanValue(check.matches(reachabilitySet, m));
+        },
+      };
+    }
+  }
+  let initializer: MatchInitializer;
+  const firstID = fixedID(path.nodes[0]);
+  const lastID = fixedID(path.nodes[path.nodes.length - 1]);
+  if (firstID) {
+    initializer = new MoveHeadToID(firstID);
+  } else if (lastID) {
+    path = reversePath(path);
+    initializer = new MoveHeadToID(lastID);
+  } else if (path.nodes[0].name || path.nodes[path.nodes.length - 1].name) {
+    if (!path.nodes[0].name && path.nodes[path.nodes.length - 1].name) {
+      path = reversePath(path);
+    }
+    initializer = new MoveHeadToVariable(path.nodes[0].name!);
+  } else {
+    initializer = new ScanGraph();
+  }
+  const steps = matchSteps(path, false);
+  return {
+    stageName: () => 'match_path_existence',
+    stageChildren(): QueryPlanStage[] {
+      return [initializer, ...steps];
+    },
+    stageData: () => null,
+    execute(
+      graph: Graph<Value>,
+      queryStats: QueryStatsState,
+    ): (match: Match) => Value {
+      const expandMatch = prepareExpandMatch(
+        initializer,
+        steps,
+        graph,
+        queryStats,
+      );
+      return (match) => {
+        return booleanValue(!expandMatch(match).next().done);
+      };
+    },
+  };
+}
+
+function nodeOnlyMatchesID(node: ASTNode): boolean {
+  return (
+    node.name === null &&
+    node.label === null &&
+    !node.properties?.some(([k, v]) => k !== '_ID')
+  );
 }
 
 export function planEvaluate(expression: Expression): EvaluateStage {
@@ -594,13 +893,13 @@ export function planEvaluate(expression: Expression): EvaluateStage {
     return {
       stageName: () => 'identifier',
       stageChildren(): QueryPlanStage[] {
-          return [];
+        return [];
       },
       stageData: () => [['name', expression.value]],
       execute(
-          graph: Graph<Value>,
-          queryStats: QueryStatsState,
-          functions: Map<string, Func>,
+        graph: Graph<Value>,
+        queryStats: QueryStatsState,
+        functions: Map<string, Func>,
       ): (variables: Match) => Value {
         return (variables: Match) => {
           const v = variables.get(expression.value);
@@ -611,20 +910,86 @@ export function planEvaluate(expression: Expression): EvaluateStage {
           }
           return v;
         };
-      }
+      },
+    };
+  } else if (expression.kind === 'and') {
+    const children = expression.value.map(planEvaluate);
+    return {
+      stageName: () => 'and',
+      stageChildren(): QueryPlanStage[] {
+        return children;
+      },
+      stageData: () => [],
+      execute(
+        graph: Graph<Value>,
+        queryStats: QueryStatsState,
+        functions: Map<string, Func>,
+      ): (variables: Match) => Value {
+        const evaluates = children.map((c) =>
+          c.execute(graph, queryStats, functions),
+        );
+        return (variables: Match) => {
+          for (const evaluate of evaluates) {
+            // TODO: test
+            const b = tryCastBoolean(evaluate(variables));
+            if (b === undefined) {
+              throw new Error(
+                `Expression is not a boolean: ${JSON.stringify(expression.value)}`,
+              );
+            }
+            if (!b) {
+              return FALSE;
+            }
+          }
+          return TRUE;
+        };
+      },
+    };
+  } else if (expression.kind === 'or') {
+    const children = expression.value.map(planEvaluate);
+    return {
+      stageName: () => 'or',
+      stageChildren(): QueryPlanStage[] {
+        return children;
+      },
+      stageData: () => [],
+      execute(
+        graph: Graph<Value>,
+        queryStats: QueryStatsState,
+        functions: Map<string, Func>,
+      ): (variables: Match) => Value {
+        const evaluates = children.map((c) =>
+          c.execute(graph, queryStats, functions),
+        );
+        return (variables: Match) => {
+          for (const evaluate of evaluates) {
+            // TODO: test
+            const b = tryCastBoolean(evaluate(variables));
+            if (b === undefined) {
+              throw new Error(
+                `Expression is not a boolean: ${JSON.stringify(expression.value)}`,
+              );
+            }
+            if (b) {
+              return TRUE;
+            }
+          }
+          return FALSE;
+        };
+      },
     };
   } else if (expression.kind === 'not') {
     const inner = planEvaluate(expression.value);
     return {
       stageName: () => 'not',
       stageChildren(): QueryPlanStage[] {
-          return [inner];
+        return [inner];
       },
       stageData: () => [],
       execute(
-          graph: Graph<Value>,
-          queryStats: QueryStatsState,
-          functions: Map<string, Func>,
+        graph: Graph<Value>,
+        queryStats: QueryStatsState,
+        functions: Map<string, Func>,
       ): (variables: Match) => Value {
         const evaluate = inner.execute(graph, queryStats, functions);
         return (variables: Match) => {
@@ -637,49 +1002,22 @@ export function planEvaluate(expression: Expression): EvaluateStage {
           }
           return booleanValue(!b);
         };
-      }
+      },
     };
   } else if (expression.kind === 'path') {
-    // TODO: test
-    const steps = matchSteps(expression.value, false);
-    // TODO: choose better
-    const initializer = new ScanGraph();
-    return {
-      stageName: () => 'pathExistence',
-      stageChildren(): QueryPlanStage[] {
-          return [initializer, ...steps];
-      },
-      stageData: () => [],
-      execute(
-          graph: Graph<Value>,
-          queryStats: QueryStatsState,
-          functions: Map<string, Func>,
-      ): (variables: Match) => Value {
-        const expandMatch = prepareExpandMatch(
-          initializer,
-          steps,
-          graph,
-          queryStats,
-        );
-        return (variables: Match) => {
-          const matches = expandMatch(variables);
-          const foundMatch = !matches.next().done;
-          return booleanValue(foundMatch);
-        };
-      }
-    };
+    return planEvaluatePathExistence(expression.value);
   } else if (expression.kind === 'functionCall') {
     const plans = expression.args.map(planEvaluate);
     return {
       stageName: () => 'functionCall',
       stageChildren(): QueryPlanStage[] {
-          return plans;
+        return plans;
       },
       stageData: () => [['function', expression.name]],
       execute(
-          graph: Graph<Value>,
-          queryStats: QueryStatsState,
-          functions: Map<string, Func>,
+        graph: Graph<Value>,
+        queryStats: QueryStatsState,
+        functions: Map<string, Func>,
       ): (variables: Match) => Value {
         const func = functions.get(expression.name);
         if (!func) {
@@ -695,7 +1033,7 @@ export function planEvaluate(expression: Expression): EvaluateStage {
           );
           return funcEvaluate(argValues, variables);
         };
-      }
+      },
     };
   } else if (expression.kind === 'comparison') {
     const leftPlan = planEvaluate(expression.left);
@@ -716,13 +1054,13 @@ export function planEvaluate(expression: Expression): EvaluateStage {
     return {
       stageName: () => 'comparison',
       stageChildren(): QueryPlanStage[] {
-          return [leftPlan, rightPlan];
+        return [leftPlan, rightPlan];
       },
       stageData: () => [['op', expression.op]],
       execute(
-          graph: Graph<Value>,
-          queryStats: QueryStatsState,
-          functions: Map<string, Func>,
+        graph: Graph<Value>,
+        queryStats: QueryStatsState,
+        functions: Map<string, Func>,
       ): (variables: Match) => Value {
         const evaluateLeft = leftPlan.execute(graph, queryStats, functions);
         const evaluateRight = rightPlan.execute(graph, queryStats, functions);
@@ -731,7 +1069,7 @@ export function planEvaluate(expression: Expression): EvaluateStage {
             compareValues(evaluateLeft(variables), evaluateRight(variables)),
           );
         };
-      }
+      },
     };
   } else {
     throw new Error(`Unrecognized expression: ${JSON.stringify(expression)}`);
