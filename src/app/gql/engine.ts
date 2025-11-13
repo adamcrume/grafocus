@@ -235,29 +235,7 @@ class ScanGraphStep extends MatchStep {
   }
 }
 
-function filterMatches(filter: FilterStage): Stagelet {
-  return {
-    ...filter,
-    prepare(
-      graph: Graph<Value>,
-      queryStats: QueryStatsState,
-      functions: Map<string, Func>,
-    ): PreparedStagelet {
-      const matchFilter = filter.execute(graph, queryStats, functions);
-      return {
-        execute(match: Match): IterableIterator<Match> {
-          return (function* () {
-            if (matchFilter(match)) {
-              yield match;
-            }
-          })();
-        },
-      };
-    },
-  };
-}
-
-function filterByExpression(expression: Expression): FilterStage {
+function filterByExpression(expression: Expression): Stagelet {
   const evaluate = planEvaluate(expression);
   return {
     stageName: () => 'filter_by_expression',
@@ -265,24 +243,27 @@ function filterByExpression(expression: Expression): FilterStage {
       return [evaluate];
     },
     stageData: () => [['expression', formatExpression(expression)]],
-    execute(
+    prepare(
       graph: Graph<Value>,
       queryStats: QueryStatsState,
       functions: Map<string, Func>,
-    ): (match: Match) => boolean {
+    ): PreparedStagelet {
       const matcher = evaluate.execute(graph, queryStats, functions);
-      return (match: Match) => {
-        const value = matcher(match);
-        const b = tryCastBoolean(value);
-        if (b !== undefined) {
-          return b;
-        }
-        if (tryCastNull(value) !== undefined) {
-          return false;
-        }
-        throw new Error(
-          `Non-boolean value used as a predicate: ${JSON.stringify(serializeValue(value))}`,
-        );
+      return {
+        execute(match: Match): IterableIterator<Match> {
+          const value = matcher(match);
+          const b = tryCastBoolean(value);
+          if (b === undefined && tryCastNull(value) === undefined) {
+            throw new Error(
+              `Non-boolean value used as a predicate: ${JSON.stringify(serializeValue(value))}`,
+            );
+          }
+          return (function* () {
+            if (b) {
+              yield match;
+            }
+          })();
+        },
       };
     },
   };
@@ -338,7 +319,7 @@ interface PreparedReadPlan {
 function makeReadPlan(paths: Path[], where: Expression | null): ReadPlan {
   const stages = paths.map((p) => planReadPath(p, true));
   if (where) {
-    stages.push(filterMatches(filterByExpression(where)));
+    stages.push(filterByExpression(where));
   }
   return { stages };
 }
