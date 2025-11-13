@@ -119,7 +119,11 @@ function describeQueryPlanStage(stage: QueryPlanStage, indent: number): string {
           first = false;
           details += k;
           details += '=';
-          details += v;
+          if (typeof v === 'string') {
+            details += v;
+          } else {
+            details += JSON.stringify(serializeValue(v));
+          }
         } else {
           if (!first) {
             details += ', ';
@@ -195,7 +199,6 @@ interface FilterStage extends QueryPlanStage {
     graph: Graph<Value>,
     queryStats: QueryStatsState,
     functions: Map<string, Func>,
-    // TODO: should this return Value instead of boolean?
   ): (match: Match) => boolean;
 }
 
@@ -516,7 +519,7 @@ function filterByExpression(expression: Expression): FilterStage {
         queryStats: QueryStatsState,
         functions: Map<string, Func>,
       ): (match: Match) => boolean {
-        const matcher = evaluate(graph, queryStats, functions);
+        const matcher = evaluate.execute(graph, queryStats, functions);
         return (match: Match) => {
           const value = matcher(match);
           const b = tryCastBoolean(value);
@@ -805,7 +808,7 @@ function planSet(set_: SetClause): Stage {
         queryStats: QueryStatsState,
         functions: Map<string, Func>,
       ) => {
-        const partialExpression = expression(graph, queryStats, functions);
+        const partialExpression = expression.execute(graph, queryStats, functions);
         return (match: Match) => {
           const value = match.get(variable);
           if (!value) {
@@ -1010,7 +1013,7 @@ function planReturn(returnClause: ReturnClause): Stage {
     },
     execute(state: State): void {
       const partialExpressions = expressions.map((e) =>
-        e(state.graph, state.queryStats, state.functions),
+        e.execute(state.graph, state.queryStats, state.functions),
       );
       state.returnValue = state.matches.map((m) =>
         partialExpressions.map((e) => e(m)),

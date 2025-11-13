@@ -15,7 +15,7 @@
  */
 
 import {
-  EvaluatePlan,
+  EvaluateStage,
   Func,
   Match,
   matchSteps,
@@ -38,7 +38,7 @@ import {
 interface CreateNodePlan {
   name: string | null;
   labels: string[];
-  properties: Array<[string, EvaluatePlan]>;
+  properties: Array<[string, EvaluateStage]>;
 }
 
 interface CreateEdgePlan {
@@ -46,7 +46,7 @@ interface CreateEdgePlan {
   srcOffset: number;
   dstOffset: number;
   labels: string[];
-  properties: Array<[string, EvaluatePlan]>;
+  properties: Array<[string, EvaluateStage]>;
 }
 
 interface PartiallyEvaluatedCreateNodePlan {
@@ -100,7 +100,7 @@ function planCreateEdge(e: ASTEdge): CreateEdgePlan {
     }
     labels.push(e.label.value);
   }
-  let properties: Array<[string, EvaluatePlan]> = (e.properties ?? []).map(
+  let properties: Array<[string, EvaluateStage]> = (e.properties ?? []).map(
     ([k, v]) => {
       return [k, planEvaluate(v)];
     },
@@ -124,13 +124,13 @@ export function prepareCreate(
     partiallyEvaluatedPathNodes: createPlan.pathNodes.map((n) => ({
       ...n,
       properties: n.properties.map(([k, v]) => {
-        return [k, v(graph, queryStats, functions)];
+        return [k, v.execute(graph, queryStats, functions)];
       }),
     })),
     partiallyEvaluatedPathEdges: createPlan.pathEdges.map((e) => ({
       ...e,
       properties: e.properties.map(([k, v]) => {
-        return [k, v(graph, queryStats, functions)];
+        return [k, v.execute(graph, queryStats, functions)];
       }),
     })),
   };

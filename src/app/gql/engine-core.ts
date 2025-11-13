@@ -44,7 +44,7 @@ export type QueryPlanStageData =
   | null
   | string
   | string[]
-  | Array<[string, string | null]>;
+  | Array<[string, Value | string | null]>;
 
 export interface QueryPlanStage {
   stageName(): string;
@@ -560,87 +560,142 @@ export type Func = (
   queryStats: QueryStatsState,
 ) => FunctionPlan;
 
-export type EvaluatePlan = (
-  graph: Graph<Value>,
-  queryStats: QueryStatsState,
-  functions: Map<string, Func>,
-) => (variables: Match) => Value;
-
-export function planEvaluate(expression: Expression): EvaluatePlan {
-  if (expression.kind === 'string') {
-    const v = stringValue(expression.value);
-    return () => () => v;
-  } else if (expression.kind === 'number') {
-    const v = numberValue(expression.value);
-    return () => () => v;
-  } else if (expression.kind === 'identifier') {
-    return (graph: Graph<Value>) => (variables: Match) => {
-      const v = variables.get(expression.value);
-      if (!v) {
-        throw new Error(
-          `Variable ${JSON.stringify(expression.value)} not found`,
-        );
-      }
-      return v;
-    };
-  } else if (expression.kind === 'not') {
-    const inner = planEvaluate(expression.value);
-    return (
+export interface EvaluateStage extends QueryPlanStage {
+  execute(
       graph: Graph<Value>,
       queryStats: QueryStatsState,
       functions: Map<string, Func>,
-    ) => {
-      const evaluate = inner(graph, queryStats, functions);
-      return (variables: Match) => {
-        // TODO: test
-        const b = tryCastBoolean(evaluate(variables));
-        if (b === undefined) {
-          throw new Error(
-            `Expression is not a boolean: ${JSON.stringify(expression.value)}`,
-          );
-        }
-        return booleanValue(!b);
-      };
+  ): (variables: Match) => Value;
+}
+
+function planConstant(value: Value): EvaluateStage {
+  return {
+    stageName: () => 'constant',
+    stageChildren(): QueryPlanStage[] {
+        return [];
+    },
+    stageData: () => [['value', value]],
+    execute(
+        graph: Graph<Value>,
+        queryStats: QueryStatsState,
+        functions: Map<string, Func>,
+    ): (variables: Match) => Value {
+        return () => value;
+    }
+  };
+}
+
+export function planEvaluate(expression: Expression): EvaluateStage {
+  if (expression.kind === 'string') {
+    return planConstant(stringValue(expression.value));
+  } else if (expression.kind === 'number') {
+    return planConstant(numberValue(expression.value));
+  } else if (expression.kind === 'identifier') {
+    return {
+      stageName: () => 'identifier',
+      stageChildren(): QueryPlanStage[] {
+          return [];
+      },
+      stageData: () => [['name', expression.value]],
+      execute(
+          graph: Graph<Value>,
+          queryStats: QueryStatsState,
+          functions: Map<string, Func>,
+      ): (variables: Match) => Value {
+        return (variables: Match) => {
+          const v = variables.get(expression.value);
+          if (!v) {
+            throw new Error(
+              `Variable ${JSON.stringify(expression.value)} not found`,
+            );
+          }
+          return v;
+        };
+      }
+    };
+  } else if (expression.kind === 'not') {
+    const inner = planEvaluate(expression.value);
+    return {
+      stageName: () => 'not',
+      stageChildren(): QueryPlanStage[] {
+          return [inner];
+      },
+      stageData: () => [],
+      execute(
+          graph: Graph<Value>,
+          queryStats: QueryStatsState,
+          functions: Map<string, Func>,
+      ): (variables: Match) => Value {
+        const evaluate = inner.execute(graph, queryStats, functions);
+        return (variables: Match) => {
+          // TODO: test
+          const b = tryCastBoolean(evaluate(variables));
+          if (b === undefined) {
+            throw new Error(
+              `Expression is not a boolean: ${JSON.stringify(expression.value)}`,
+            );
+          }
+          return booleanValue(!b);
+        };
+      }
     };
   } else if (expression.kind === 'path') {
     // TODO: test
     const steps = matchSteps(expression.value, false);
     // TODO: choose better
     const initializer = new ScanGraph();
-    return (graph: Graph<Value>, queryStats: QueryStatsState) => {
-      const expandMatch = prepareExpandMatch(
-        initializer,
-        steps,
-        graph,
-        queryStats,
-      );
-      return (variables: Match) => {
-        const matches = expandMatch(variables);
-        const foundMatch = !matches.next().done;
-        return booleanValue(foundMatch);
-      };
+    return {
+      stageName: () => 'pathExistence',
+      stageChildren(): QueryPlanStage[] {
+          return [initializer, ...steps];
+      },
+      stageData: () => [],
+      execute(
+          graph: Graph<Value>,
+          queryStats: QueryStatsState,
+          functions: Map<string, Func>,
+      ): (variables: Match) => Value {
+        const expandMatch = prepareExpandMatch(
+          initializer,
+          steps,
+          graph,
+          queryStats,
+        );
+        return (variables: Match) => {
+          const matches = expandMatch(variables);
+          const foundMatch = !matches.next().done;
+          return booleanValue(foundMatch);
+        };
+      }
     };
   } else if (expression.kind === 'functionCall') {
     const plans = expression.args.map(planEvaluate);
-    return (
-      graph: Graph<Value>,
-      queryStats: QueryStatsState,
-      functions: Map<string, Func>,
-    ) => {
-      const func = functions.get(expression.name);
-      if (!func) {
-        throw new Error(`Unrecognized function: ${expression.name}`);
-      }
-      const funcEvaluate = func(graph, queryStats);
-      const argsEvaluate = plans.map((arg: EvaluatePlan) =>
-        arg(graph, queryStats, functions),
-      );
-      return (variables: Match) => {
-        const argValues = argsEvaluate.map((arg: (m: Match) => Value) =>
-          arg(variables),
+    return {
+      stageName: () => 'functionCall',
+      stageChildren(): QueryPlanStage[] {
+          return plans;
+      },
+      stageData: () => [['function', expression.name]],
+      execute(
+          graph: Graph<Value>,
+          queryStats: QueryStatsState,
+          functions: Map<string, Func>,
+      ): (variables: Match) => Value {
+        const func = functions.get(expression.name);
+        if (!func) {
+          throw new Error(`Unrecognized function: ${expression.name}`);
+        }
+        const funcEvaluate = func(graph, queryStats);
+        const argsEvaluate = plans.map((arg: EvaluateStage) =>
+          arg.execute(graph, queryStats, functions),
         );
-        return funcEvaluate(argValues, variables);
-      };
+        return (variables: Match) => {
+          const argValues = argsEvaluate.map((arg: (m: Match) => Value) =>
+            arg(variables),
+          );
+          return funcEvaluate(argValues, variables);
+        };
+      }
     };
   } else if (expression.kind === 'comparison') {
     const leftPlan = planEvaluate(expression.left);
@@ -658,18 +713,25 @@ export function planEvaluate(expression: Expression): EvaluatePlan {
         `Unrecognized comparison: ${JSON.stringify(expression.op)}`,
       );
     }
-    return (
-      graph: Graph<Value>,
-      queryStats: QueryStatsState,
-      functions: Map<string, Func>,
-    ) => {
-      const evaluateLeft = leftPlan(graph, queryStats, functions);
-      const evaluateRight = rightPlan(graph, queryStats, functions);
-      return (variables: Match) => {
-        return compare(
-          compareValues(evaluateLeft(variables), evaluateRight(variables)),
-        );
-      };
+    return {
+      stageName: () => 'comparison',
+      stageChildren(): QueryPlanStage[] {
+          return [leftPlan, rightPlan];
+      },
+      stageData: () => [['op', expression.op]],
+      execute(
+          graph: Graph<Value>,
+          queryStats: QueryStatsState,
+          functions: Map<string, Func>,
+      ): (variables: Match) => Value {
+        const evaluateLeft = leftPlan.execute(graph, queryStats, functions);
+        const evaluateRight = rightPlan.execute(graph, queryStats, functions);
+        return (variables: Match) => {
+          return compare(
+            compareValues(evaluateLeft(variables), evaluateRight(variables)),
+          );
+        };
+      }
     };
   } else {
     throw new Error(`Unrecognized expression: ${JSON.stringify(expression)}`);
