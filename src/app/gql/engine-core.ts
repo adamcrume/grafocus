@@ -129,6 +129,18 @@ export interface Stage extends QueryPlanStage {
   execute(state: State): void;
 }
 
+export interface MatchExpander {
+  execute(matches: Match): IterableIterator<Match>;
+}
+
+export interface MatchExpandStage extends QueryPlanStage {
+  prepare(
+    graph: Graph<Value>,
+    queryStats: QueryStatsState,
+    functions: Map<string, Func>,
+  ): MatchExpander;
+}
+
 function labelsMatch(
   labels: Immutable.Set<string>,
   pattern: LabelExpression,
@@ -797,8 +809,10 @@ function planConstant(value: Value): EvaluateStage {
   };
 }
 
-// TODO: unify with planReadPath in engine.ts.
-function planEvaluatePathExistence(path: Path): EvaluateStage {
+export function planReadPath(
+  path: Path,
+  allowNewVariables: boolean,
+): MatchExpandStage {
   if (
     path.nodes.length === 2 &&
     path.edges[0].quantifier?.min === 0 &&
@@ -821,30 +835,43 @@ function planEvaluatePathExistence(path: Path): EvaluateStage {
       const build = new BuildReachabilitySet(startID ?? '', path.edges[0]);
       const check = new CheckReachabilitySet(path.nodes[last].name ?? '');
       return {
-        stageName: () => 'match_path_existence',
+        stageName: () => 'read_path',
         stageChildren(): QueryPlanStage[] {
           return [build, check];
         },
         stageData: () => [],
-        execute(
+        prepare(
           graph: Graph<Value>,
           queryStats: QueryStatsState,
-        ): (match: Match) => Value {
+        ): MatchExpander {
           const reachabilitySet = build.build(graph, queryStats);
-          return (m) => booleanValue(check.matches(reachabilitySet, m));
+          return {
+            execute(match: Match): IterableIterator<Match> {
+              return (function* () {
+                if (check.matches(reachabilitySet, match)) {
+                  yield match;
+                }
+              })();
+            },
+          };
         },
       };
     }
   }
-  let initializer: MatchInitializer;
   const firstID = fixedID(path.nodes[0]);
   const lastID = fixedID(path.nodes[path.nodes.length - 1]);
+  let initializer: MatchInitializer;
   if (firstID) {
     initializer = new MoveHeadToID(firstID);
   } else if (lastID) {
     path = reversePath(path);
     initializer = new MoveHeadToID(lastID);
-  } else if (path.nodes[0].name || path.nodes[path.nodes.length - 1].name) {
+  } else if (
+    !allowNewVariables &&
+    (path.nodes[0].name || path.nodes[path.nodes.length - 1].name)
+  ) {
+    // TODO: Use this initializer if the variable is guaranteed to be set, not
+    // just if allowNewVariables is false.
     if (!path.nodes[0].name && path.nodes[path.nodes.length - 1].name) {
       path = reversePath(path);
     }
@@ -852,25 +879,45 @@ function planEvaluatePathExistence(path: Path): EvaluateStage {
   } else {
     initializer = new ScanGraph();
   }
-  const steps = matchSteps(path, false);
+  const steps = matchSteps(path, allowNewVariables);
   return {
-    stageName: () => 'match_path_existence',
+    stageName: () => 'read_path',
     stageChildren(): QueryPlanStage[] {
       return [initializer, ...steps];
     },
     stageData: () => null,
-    execute(
-      graph: Graph<Value>,
-      queryStats: QueryStatsState,
-    ): (match: Match) => Value {
+    prepare(graph: Graph<Value>, queryStats: QueryStatsState): MatchExpander {
       const expandMatch = prepareExpandMatch(
         initializer,
         steps,
         graph,
         queryStats,
       );
+      return {
+        execute(match: Match): IterableIterator<Match> {
+          return expandMatch(match);
+        },
+      };
+    },
+  };
+}
+
+function planEvaluatePathExistence(path: Path): EvaluateStage {
+  const readPath = planReadPath(path, false);
+  return {
+    stageName: () => 'match_path_existence',
+    stageChildren(): QueryPlanStage[] {
+      return [readPath];
+    },
+    stageData: () => null,
+    execute(
+      graph: Graph<Value>,
+      queryStats: QueryStatsState,
+      functions: Map<string, Func>,
+    ): (match: Match) => Value {
+      const read = readPath.prepare(graph, queryStats, functions);
       return (match) => {
-        return booleanValue(!expandMatch(match).next().done);
+        return booleanValue(!read.execute(match).next().done);
       };
     },
   };

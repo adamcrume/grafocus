@@ -154,12 +154,13 @@ describe('describeQueryPlan', () => {
       match_node: name=x
     filter_by_expression: expression=()-->(x)-->()
       match_path_existence
-        scan_graph
-        match_node
-        match_edge: direction=RIGHT
-        match_node: name=x
-        match_edge: direction=RIGHT
-        match_node
+        read_path
+          scan_graph
+          match_node
+          match_edge: direction=RIGHT
+          match_node: name=x
+          match_edge: direction=RIGHT
+          match_node
   return: x
 `,
     );
@@ -177,12 +178,13 @@ describe('describeQueryPlan', () => {
       match_node: name=x
     filter_by_expression: expression=({_ID: "y"})-->(x)-->(:Foo)
       match_path_existence
-        move_head_to_id: y
-        match_node: properties={_ID: "y"}
-        match_edge: direction=RIGHT
-        match_node: name=x
-        match_edge: direction=RIGHT
-        match_node: label=Foo
+        read_path
+          move_head_to_id: y
+          match_node: properties={_ID: "y"}
+          match_edge: direction=RIGHT
+          match_node: name=x
+          match_edge: direction=RIGHT
+          match_node: label=Foo
   return: x
 `,
     );
@@ -200,12 +202,13 @@ describe('describeQueryPlan', () => {
       match_node: name=x
     filter_by_expression: expression=(:Foo)-->(x)-->({_ID: "y"})
       match_path_existence
-        move_head_to_id: y
-        match_node: properties={_ID: "y"}
-        match_edge: direction=LEFT
-        match_node: name=x
-        match_edge: direction=LEFT
-        match_node: label=Foo
+        read_path
+          move_head_to_id: y
+          match_node: properties={_ID: "y"}
+          match_edge: direction=LEFT
+          match_node: name=x
+          match_edge: direction=LEFT
+          match_node: label=Foo
   return: x
 `,
     );

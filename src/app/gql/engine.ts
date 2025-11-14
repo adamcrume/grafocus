@@ -24,6 +24,8 @@ import {
   fixedID,
   Func,
   Match,
+  MatchExpander,
+  MatchExpandStage,
   MatchInitializer,
   MatchStep,
   matchSteps,
@@ -31,6 +33,7 @@ import {
   MoveHeadToVariable,
   PathMatch,
   planEvaluate,
+  planReadPath,
   prepareExpandMatch,
   QueryPlanStage,
   QueryPlanStageData,
@@ -184,18 +187,6 @@ function joinMatches(left: Match[], right: Match[]): Match[] {
   return result;
 }
 
-interface Stagelet extends QueryPlanStage {
-  prepare(
-    graph: Graph<Value>,
-    queryStats: QueryStatsState,
-    functions: Map<string, Func>,
-  ): PreparedStagelet;
-}
-
-interface PreparedStagelet {
-  execute(matches: Match): IterableIterator<Match>;
-}
-
 interface FilterStage extends QueryPlanStage {
   execute(
     graph: Graph<Value>,
@@ -235,7 +226,7 @@ class ScanGraphStep extends MatchStep {
   }
 }
 
-function filterByExpression(expression: Expression): Stagelet {
+function filterByExpression(expression: Expression): MatchExpandStage {
   const evaluate = planEvaluate(expression);
   return {
     stageName: () => 'filter_by_expression',
@@ -247,7 +238,7 @@ function filterByExpression(expression: Expression): Stagelet {
       graph: Graph<Value>,
       queryStats: QueryStatsState,
       functions: Map<string, Func>,
-    ): PreparedStagelet {
+    ): MatchExpander {
       const matcher = evaluate.execute(graph, queryStats, functions);
       return {
         execute(match: Match): IterableIterator<Match> {
@@ -269,51 +260,12 @@ function filterByExpression(expression: Expression): Stagelet {
   };
 }
 
-// TODO: unify with planEvaluatePathExistence in engine-core.ts.
-function planReadPath(path: Path, allowNewVariables: boolean): Stagelet {
-  const firstID = fixedID(path.nodes[0]);
-  const lastID = fixedID(path.nodes[path.nodes.length - 1]);
-  let initializer: MatchInitializer;
-  if (firstID) {
-    initializer = new MoveHeadToID(firstID);
-  } else if (lastID) {
-    path = reversePath(path);
-    initializer = new MoveHeadToID(lastID);
-  } else {
-    initializer = new ScanGraph();
-  }
-  const steps = matchSteps(path, allowNewVariables);
-  return {
-    stageName: () => 'read_path',
-    stageChildren(): QueryPlanStage[] {
-      return [initializer, ...steps];
-    },
-    stageData: () => null,
-    prepare(
-      graph: Graph<Value>,
-      queryStats: QueryStatsState,
-    ): PreparedStagelet {
-      const expandMatch = prepareExpandMatch(
-        initializer,
-        steps,
-        graph,
-        queryStats,
-      );
-      return {
-        execute(match: Match): IterableIterator<Match> {
-          return expandMatch(match);
-        },
-      };
-    },
-  };
-}
-
 interface ReadPlan {
-  stages: Stagelet[];
+  stages: MatchExpandStage[];
 }
 
 interface PreparedReadPlan {
-  stages: PreparedStagelet[];
+  stages: MatchExpander[];
 }
 
 function makeReadPlan(paths: Path[], where: Expression | null): ReadPlan {
