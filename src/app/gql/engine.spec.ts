@@ -659,6 +659,65 @@ describe('execute', () => {
     );
   });
 
+  it('can filter by negated anded quantified path existence with many branches', () => {
+    // Looks like:
+    //
+    //       n1a    n2a
+    //      /   \  /   \
+    // start     n1     n2 ... end
+    //      \   /  \   /
+    //       n1b    n2b
+    let graph = newGraph().createNode('start').createNode('end');
+    let prev = 'start';
+    for (let i = 1; i < 20; i++) {
+      graph = graph
+        .createNode(`n${i}`)
+        .createNode(`n${i}a`)
+        .createNode(`n${i}b`)
+        .createEdge(`e${i}ai`, prev, `n${i}a`)
+        .createEdge(`e${i}bi`, prev, `n${i}b`)
+        .createEdge(`e${i}ao`, `n${i}a`, `n${i}`)
+        .createEdge(`e${i}bo`, `n${i}b`, `n${i}`);
+      prev = `n${i}`;
+    }
+    graph = graph
+      .createEdge('e19', 'n19', 'end')
+      .createNode('s1')
+      .createNode('s2')
+      .createEdge('es1', 'start', 's1')
+      .createEdge('es2', 's2', 'end');
+    const query =
+      'match (x) where not (({_ID:"start"})-->*(x) and (x)-->*({_ID:"end"})) return x';
+    const { stats, data } = executeQuery(query, graph);
+    expect(data).toEqual([['s1'], ['s2']]);
+    expect(stats).toEqual(
+      jasmine.objectContaining({
+        nodesVisited: 181,
+      }),
+    );
+  });
+
+  it('can filter by negated anded quantified path existence with cycles', () => {
+      const graph = newGraph()
+          .createNode('start')
+          .createNode('end')
+          .createNode('n1')
+          .createNode('n2')
+          .createEdge('e1', 'start', 'n1')
+          .createEdge('e2', 'n1', 'end')
+          .createEdge('e3', 'n1', 'n1')
+          .createEdge('e4', 'start', 'n2');
+    const query =
+      'match (x) where not (({_ID:"start"})-->*(x) and (x)-->*({_ID:"end"})) return x';
+    const { stats, data } = executeQuery(query, graph);
+    expect(data).toEqual([['n2']]);
+    expect(stats).toEqual(
+      jasmine.objectContaining({
+        nodesVisited: 11,
+      }),
+    );
+  });
+
   it('can filter by labeled quantified path existence', () => {
     const graph = newGraph()
       .createNode('start')
